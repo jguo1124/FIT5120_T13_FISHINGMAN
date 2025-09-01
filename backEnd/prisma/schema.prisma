@@ -1,0 +1,69 @@
+datasource db { provider = "mysql"; url = env("DATABASE_URL") }
+generator client { provider = "prisma-client-js" }
+
+model Zone {
+  id    Int     @id @default(autoincrement())
+  code  String  @unique
+  name  String
+  sizes SizeLimit[]
+  quotas Quota[]
+  seasons Season[]
+}
+
+model Species {
+  id            Int         @id @default(autoincrement())
+  code          String      @unique
+  common_name   String
+  scientific_name String?
+  sizes         SizeLimit[]
+  quotas        Quota[]
+  seasons      Season[]
+}
+
+model SizeLimit {
+  id           Int      @id @default(autoincrement())
+  speciesId    Int
+  zoneId       Int
+  min_cm       Decimal? @db.Decimal(5,2)
+  max_cm       Decimal? @db.Decimal(5,2)
+  effective_from DateTime
+  effective_to   DateTime?
+  species      Species  @relation(fields: [speciesId], references: [id])
+  zone         Zone     @relation(fields: [zoneId], references: [id])
+  @@index([speciesId, zoneId, effective_from])
+}
+
+model Quota {
+  id           Int      @id @default(autoincrement())
+  speciesId    Int
+  zoneId       Int
+  daily_limit  Int?
+  seasonal_limit Int?
+  season_start DateTime?
+  season_end   DateTime?
+  effective_from DateTime
+  effective_to   DateTime?
+  species      Species @relation(fields: [speciesId], references: [id])
+  zone         Zone    @relation(fields: [zoneId], references: [id])
+  @@index([speciesId, zoneId, effective_from])
+}
+
+model Season {
+  id           Int      @id @default(autoincrement())
+  speciesId    Int
+  zoneId       Int
+  closed_from  DateTime
+  closed_to    DateTime
+  effective_from DateTime
+  effective_to   DateTime?
+  species      Species @relation(fields: [speciesId], references: [id])
+  zone         Zone    @relation(fields: [zoneId], references: [id])
+  @@index([speciesId, zoneId, closed_from])
+}
+
+model RegulationVersion {
+  id          Int      @id @default(autoincrement())
+  source      String?
+  imported_at DateTime @default(now())
+  checksum    String?
+}
