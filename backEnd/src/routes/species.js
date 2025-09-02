@@ -11,10 +11,10 @@ r.get("/:code", async (req, res) => {
   const { code } = req.params;
   const { zone, onDate } = req.query;
 
-  if (!zone) return res.status(400).json({ error: "zone required", requires_zone: true });
+  if (!zone) return res.status(400).json({ error: { code: "requires_zone" } });
 
   const out = await getRulesSnapshot(code, String(zone), onDate);
-  if (!out) return res.status(404).json({ error: "species not found" });
+  if (!out) return res.status(404).json({ error: { code: "species_not_found" } });
 
   const ver = await getCurrentVersionId();
 

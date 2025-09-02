@@ -1,4 +1,4 @@
-import { MOCK, SPECIES_META, REG_VERSION } from "../../Data/MockData.js";
+import { MOCK, SPECIES_META, REG_VERSION, ZONE_RESTRICTIONS } from "../../Data/MockData.js";
 
 const parse = (d) => new Date(d + "T00:00:00Z");
 
@@ -6,8 +6,12 @@ export async function getSpeciesByCode(code) {
   return SPECIES_META[code] || null;
 }
 
-export async function getZoneByCode(zoneCode) {
+export async function getAllSpeciesCodes() {
+  // 也可以用 Object.keys(MOCK)
+  return Object.keys(SPECIES_META);
+}
 
+export async function getZoneByCode(zoneCode) {
   return { code: zoneCode };
 }
 
@@ -51,7 +55,18 @@ export async function getRuleSnapshot(code, zoneCode, onDateStr) {
     meta: { version_id: REG_VERSION, updated_at: new Date().toISOString() }
   };
 }
+
+// 读取某区域在某日“生效的”区域限制；不带 species 过滤
+export async function getZoneRestrictions(zoneCode, onDateStr) {
+  const at = onDateStr || new Date().toISOString().slice(0,10);
+  const list = ZONE_RESTRICTIONS[zoneCode] || [];
+  return list.filter(r => {
+    const fromOk = !r.effective_from || r.effective_from <= at;
+    const toOk   = !r.effective_to   || at <= r.effective_to;
+    return fromOk && toOk;
+  });
+}
+
 export async function getCurrentVersionId() {
   return REG_VERSION;
 }
-

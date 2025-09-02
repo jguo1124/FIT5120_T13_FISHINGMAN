@@ -11,6 +11,20 @@ const year = new Date().getFullYear()
 </script>
 
 <style scoped>
-.footer { margin-top:24px; padding:12px 16px; border-top:1px solid #eee; color:#666; }
+.footer {
+
+  margin-top: 0;
+
+  height: var(--footer-height);
+
+  padding: 0 16px;
+
+  border-top: 1px solid #eee;
+  color: #666;
+
+
+  display: flex;
+  align-items: center;
+}
 .inner { max-width: 1080px; margin: 0 auto; }
 </style>

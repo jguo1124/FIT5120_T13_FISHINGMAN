@@ -1,87 +1,180 @@
 <template>
   <main class="about">
-    <!-- Hero -->
-    <section class="hero">
-      <h1>About GoFish</h1>
-      <p class="tag">Conserving Nature under Climate Change</p>
-      <p class="lead">
-        GoFish is an integrated compliance and conservation tool for recreational fishers.
-        It consolidates size limits, quotas, seasonal closures, and zone restrictions into
-        a single dashboard so you can fish responsibly and protect biodiversity.
+    <!-- Who we are -->
+    <section class="section container">
+      <h2 class="section-title">Who are we?</h2>
+      <p class="section-subtitle">
+        GoFish is a community-driven initiative created to help recreational fishers
+        enjoy the waters while protecting the environment. We provide clear, trusted,
+        and up-to-date fishing regulations in one simple platform.
       </p>
-      <RouterLink to="/dashboard" class="btn primary">Open Dashboard</RouterLink>
+      <ul class="list">
+        <li>Promote sustainable and responsible fishing practices</li>
+        <li>Make rules easy to find and understand</li>
+        <li>Encourage respect for aquatic ecosystems</li>
+      </ul>
     </section>
 
-    <!-- Why it matters -->
-    <section class="grid">
-      <article class="card">
-        <h3>Why it matters</h3>
-        <ul class="bullets">
-          <li>Warming waters shift breeding seasons and species ranges.</li>
-          <li>Extreme weather increases local habitat stress.</li>
-          <li>Overfishing plus climate pressure magnifies risks.</li>
-        </ul>
-      </article>
-      <article class="card">
-        <h3>Our mission</h3>
-        <ul class="bullets">
-          <li>Make rules clear and trusted—what, where, and when you can fish.</li>
-          <li>Unify regional differences into one simple view.</li>
-          <li>Detect protected species and alert in real time.</li>
-        </ul>
-      </article>
+    <div class="container"><hr class="divider" /></div>
+
+    <!-- Our strategy -->
+    <section class="section container">
+      <h2 class="section-title">Our strategy</h2>
+      <p class="section-subtitle">
+        We believe clear information leads to better compliance and stronger
+        conservation. GoFish's strategy focuses on three key directions:
+      </p>
+      <ul class="list">
+        <li>Simplify: present fishing rules in an easy, accessible dashboard</li>
+        <li>Educate: highlight why limits and closures protect fish stocks</li>
+        <li>Inspire: encourage every angler to become a steward of nature</li>
+      </ul>
     </section>
 
-    <!-- Features aligned to stories -->
-    <section class="features">
-      <h2>What GoFish provides</h2>
-      <div class="cards">
-        <article class="feature"><h4>Size Limits</h4><p>Minimum/maximum legal sizes per species. “No size limits” when missing.</p></article>
-        <article class="feature"><h4>Catch Quotas</h4><p>Daily and seasonal quotas; auto-update by zone. “No quota limits” when none.</p></article>
-        <article class="feature"><h4>Seasonal Closures</h4><p>Clear “Closed Season” badge when applicable; otherwise “Open Season”.</p></article>
-        <article class="feature"><h4>Zone Rules</h4><p>Select a zone to see only relevant restrictions; default guidance if none.</p></article>
-        <article class="feature"><h4>Integrated Dashboard</h4><p>All four rule types together with placeholders for missing data.</p></article>
-        <article class="feature"><h4>Protected Species</h4><p>Cross-checks catches with threatened lists in under 5s; alerts within 3s.</p></article>
-        <article class="feature"><h4>Compliance Records</h4><p>Logs species, time, and location for proof of compliance.</p></article>
+    <div class="container"><hr class="divider" /></div>
+
+    <!-- Our people -->
+    <section class="section container">
+      <h2 class="section-title">Our people</h2>
+      <p class="section-subtitle">
+        We are a diverse team of developers, researchers, and outdoor enthusiasts
+        who care deeply about healthy rivers, lakes, and oceans.  
+        Together with volunteers, educators, and local communities we keep
+        GoFish up-to-date and relevant.
+      </p>
+    </section>
+
+    <div class="container"><hr class="divider" /></div>
+
+    <!-- What we do -->
+    <section class="section features container">
+      <h2 class="section-title">What we do</h2>
+      <p class="section-subtitle">
+        GoFish combines conservation knowledge with digital tools to support
+        recreational fishers everywhere.
+      </p>
+      <div class="grid">
+        <div class="card"><div class="icon">📏</div><h3>Size limits</h3><p>Show legal size ranges for each species to prevent overharvest.</p></div>
+        <div class="card"><div class="icon">📊</div><h3>Catch quotas</h3><p>Daily and seasonal quotas explained clearly for every zone.</p></div>
+        <div class="card"><div class="icon">🗓️</div><h3>Seasonal closures</h3><p>Highlight when and where fishing is closed to allow stock recovery.</p></div>
+        <div class="card"><div class="icon">🗺️</div><h3>Zones</h3><p>Interactive maps of fishing zones with rules relevant to each area.</p></div>
       </div>
     </section>
 
-    <!-- CTA -->
-    <section class="bottom-cta">
-      <h3>Make every trip a step toward protecting nature</h3>
-      <RouterLink to="/dashboard" class="btn primary lg">Start with GoFish</RouterLink>
+    <div class="container"><hr class="divider" /></div>
+
+    <!-- Our organisation -->
+    <section class="section features container">
+      <h2 class="section-title">Our organisation</h2>
+      <p class="section-subtitle">
+        GoFish is structured to connect science, technology, and community.
+      </p>
+      <div class="grid">
+        <div class="card">
+          <h3>Research & Data</h3>
+          <p>Work with marine scientists to ensure our rules reflect current ecology.</p>
+        </div>
+        <div class="card">
+          <h3>Technology</h3>
+          <p>Develop and maintain the GoFish dashboard for real-time guidance.</p>
+        </div>
+        <div class="card">
+          <h3>Community & Outreach</h3>
+          <p>Engage with anglers, schools, and conservation groups to spread awareness.</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="container"><hr class="divider" /></div>
+
+    <!-- Responsibility -->
+    <section class="section container">
+      <h2 class="section-title">Our responsibility</h2>
+      <p class="section-subtitle">
+        GoFish is committed to making recreational fishing safe, enjoyable, and
+        sustainable for future generations. We work to ensure our platform
+        is accurate, inclusive, and respectful of all communities who share
+        our waters.
+      </p>
     </section>
   </main>
 </template>
 
 <script setup lang="ts">
-import { RouterLink } from 'vue-router'
 </script>
 
 <style scoped>
-:root { --ink:#1d2939; --sub:#667085; --line:#e6eaf2; --brand:#2643e9; }
-.about { display:grid; gap:32px; padding:16px; color:var(--ink); }
-
-/* hero */
-.hero { text-align:center; padding:24px 8px 10px; border-bottom:1px solid var(--line); }
-.hero h1 { margin:0 0 8px; font-size:28px; }
-.tag { color:var(--brand); font-weight:700; margin:0 0 8px; }
-.lead { margin:0 auto 12px; max-width:840px; color:var(--sub); }
-.btn { display:inline-block; padding:10px 16px; border-radius:10px; border:1px solid var(--line);
-       background:#fff; color:var(--ink); text-decoration:none; font-weight:600; }
-.btn.primary { background:var(--brand); color:#fff; border-color:var(--brand); }
-.btn.lg { padding:12px 18px; }
-
-/* grid cards */
-.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:12px; }
-.card { background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px; }
-.bullets { list-style:disc inside; display:grid; gap:6px; margin:0; padding:0; }
-
-/* features */
-.features { display:grid; gap:12px; }
-.features .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; }
-.feature { border:1px solid var(--line); border-radius:10px; padding:12px; background:#fff; }
-
-/* bottom cta */
-.bottom-cta { text-align:center; padding:20px; border-top:1px solid var(--line); }
+.about {
+  --space-section: 100px;
+  --space-grid-gap: 16px;
+  background: #fff;
+  color: #0f172a;
+}
+.section {
+  padding-top: var(--space-section);
+  padding-bottom: var(--space-section);
+}
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+.section-title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  margin: 0 0 12px;
+}
+.section-subtitle {
+  color: #475569;
+  margin: 0 0 28px;
+}
+.list {
+  margin: 0;
+  padding-left: 20px;
+  color: #475569;
+}
+.features .grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-grid-gap);
+  margin: 0;
+}
+@media (max-width: 1024px) {
+  .features .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .features .grid { grid-template-columns: 1fr; }
+}
+.card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 18px;
+  transition: box-shadow .2s, transform .2s, border-color .2s;
+}
+.card:hover {
+  border-color: rgba(13,155,181,1);
+  box-shadow: 0 10px 24px rgba(13,155,181,0.18);
+  transform: translateY(-2px);
+}
+.card .icon { font-size: 26px; margin-bottom: 8px; }
+.card h3 { font-size: 1.125rem; font-weight: 700; margin: 0 0 6px; }
+.card p { color: #475569; margin: 0; }
+.divider {
+  display: block;
+  width: 100%;
+  border: 0;
+  height: 0;
+  border-top: 2px solid #cbd5e1;
+  margin: calc(var(--space-section) * 0.6) auto;
+}
+/* Normalize first/last child margins inside sections */
+.section > :first-child { margin-top: 0; }
+.section > :last-child  { margin-bottom: 0; }
+.section:first-of-type {
+  padding-top: var(--header-height);  
+}
+.about .section:last-of-type {
+  padding-bottom: 70px;  
+}
 </style>
