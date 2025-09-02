@@ -34,7 +34,7 @@ const displayRules = computed(() => {
 watch([zone, onDate], () => (speciesFilter.value = ""));
 
 function fmtDate(dt) {
-  if (!dt) return "—";
+  if (!dt) return "-";
   const d = typeof dt === "string" ? new Date(dt) : dt;
   if (Number.isNaN(d.getTime())) return String(dt);
   return d.toISOString().slice(0, 10);
@@ -69,7 +69,7 @@ onMounted(load);
         <label>Zone</label>
         <select v-model="zone" class="input" :disabled="loading">
           <option v-for="z in ZONES" :key="z.code" :value="z.code">
-            {{ z.code }} — {{ z.name }}
+            {{ z.code }} - {{ z.name }}
           </option>
         </select>
       </div>
@@ -84,21 +84,21 @@ onMounted(load);
         <select v-model="speciesFilter" class="input" :disabled="loading || !speciesOptions.length">
           <option value="">All species</option>
           <option v-for="s in speciesOptions" :key="s.code" :value="s.code">
-            {{ s.code }} — {{ s.name }}
+            {{ s.code }} - {{ s.name }}
           </option>
         </select>
       </div>
 
       <div class="control">
         <label>&nbsp;</label>
-        <button class="btn" :disabled="loading" @click="load">{{ loading ? "Loading…" : "Refresh" }}</button>
+        <button class="btn" :disabled="loading" @click="load">{{ loading ? "Loading..." : "Refresh" }}</button>
       </div>
     </div>
 
     <div class="results">
       <h2>Active Regulations</h2>
 
-      <div v-if="loading" class="skeleton">Loading regulations…</div>
+      <div v-if="loading" class="skeleton">Loading regulations...</div>
 
       <div v-else-if="!result?.species_rules?.length" class="empty">
         No regulations found for {{ zone }} on {{ onDate || "today" }}.
@@ -114,7 +114,7 @@ onMounted(load);
           <li v-for="zr in result.zone_restrictions" :key="zr.code + (zr.effective_from||'')">
             <div><span class="tag tag-red">Restriction</span> <b>{{ zr.title }}</b></div>
             <div class="muted">{{ zr.details }}</div>
-            <div class="muted">Effective: {{ zr.effective_from || '—' }} → {{ zr.effective_to || 'open' }}</div>
+            <div class="muted">Effective: {{ zr.effective_from || '-' }} to {{ zr.effective_to || 'open' }}</div>
             <div v-if="zr.references?.length" class="muted">
               Refs:
               <a v-for="(u,i) in zr.references" :key="i" :href="u" target="_blank" rel="noreferrer">{{ u }}</a>
@@ -140,7 +140,7 @@ onMounted(load);
             <div class="block-body">
               <template v-if="sr.size_limits?.message">{{ sr.size_limits.message }}</template>
               <template v-else>
-                Min: {{ sr.size_limits?.min_cm ?? "—" }} cm ·
+                Min: {{ sr.size_limits?.min_cm ?? "-" }} cm ·
                 Max: {{ sr.size_limits?.max_cm ?? "No limit" }}
               </template>
             </div>
@@ -152,10 +152,10 @@ onMounted(load);
             <div class="block-body">
               <template v-if="sr.quotas?.message">{{ sr.quotas.message }}</template>
               <template v-else>
-                Daily: {{ sr.quotas?.daily_limit ?? "—" }} ·
-                Seasonal: {{ sr.quotas?.seasonal_limit ?? "—" }}
+                Daily: {{ sr.quotas?.daily_limit ?? "-" }} ·
+                Seasonal: {{ sr.quotas?.seasonal_limit ?? "-" }}
                 <span v-if="sr.quotas?.season_window">
-                  · Period: {{ sr.quotas.season_window.start }} → {{ sr.quotas.season_window.end }}
+                  · Period: {{ sr.quotas.season_window.start }} to {{ sr.quotas.season_window.end }}
                 </span>
               </template>
             </div>
@@ -171,13 +171,13 @@ onMounted(load);
                   Closed ranges:
                   <ul style="margin:6px 0 0 16px;">
                     <li v-for="r in sr.season.closed_ranges" :key="`${r.from}-${r.to}`">
-                      {{ fmtDate(r.from) }} → {{ fmtDate(r.to) }}
+                      {{ fmtDate(r.from) }} to {{ fmtDate(r.to) }}
                     </li>
                   </ul>
                 </template>
                 <template v-else>No closed ranges</template>
                 <div v-if="sr.season?.next_closed_range" style="margin-top:4px;">
-                  Next closed: {{ fmtDate(sr.season.next_closed_range.from) }} →
+                  Next closed: {{ fmtDate(sr.season.next_closed_range.from) }} to
                   {{ fmtDate(sr.season.next_closed_range.to) }}
                 </div>
               </div>
@@ -210,7 +210,7 @@ onMounted(load);
 .control { min-width: 0; }
 .control label { display: block; font-size: 12px; color: #475569; margin-bottom: 6px; }
 
-/* 统一控件宽度/盒模型 */
+/* uniform box sizing */
 .controls input,
 .controls select,
 .controls .input,
@@ -249,7 +249,7 @@ onMounted(load);
   outline: none;
 }
 
-/* Date picker tweaks + 修正缺点的选择器 */
+/* Date picker tweaks + button cursor */
 .controls input[type="date"] { color-scheme: light; }
 .controls input[type="date"]::-webkit-datetime-edit,
 .controls input[type="date"]::-webkit-datetime-edit-fields-wrapper,
@@ -299,13 +299,13 @@ onMounted(load);
 }
 
 .reg-card {
-  border: 1px solid #e5e9f2;                /* 边界更清晰 */
+  border: 1px solid #e5e9f2;                
   border-radius: 12px;
   padding: 14px;
-  background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%); /* 极浅渐变提升质感 */
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%); 
   box-shadow:
-    0 1px 2px rgba(15,23,42,.04),           /* 贴边阴影 */
-    0 6px 18px rgba(15,23,42,.06);          /* 柔和主阴影 */
+    0 1px 2px rgba(15,23,42,.04),         
+    0 6px 18px rgba(15,23,42,.06);    
   transition: transform .08s ease, box-shadow .18s ease, border-color .18s ease, background-color .18s ease;
   will-change: transform, box-shadow;
 }
@@ -330,7 +330,7 @@ onMounted(load);
 .title { display: flex; align-items: center; gap: 8px; }
 
 .pill {
-  background: #f3f7ff;                      /* 略亮一点更干净 */
+  background: #f3f7ff;                      
   color: #1d4ed8;
   border: 1px solid #c8d7ff;
   padding: 4px 8px;
@@ -339,7 +339,7 @@ onMounted(load);
 .zone-at { color: #64748b; font-size: 12px; }
 
 .block {
-  border-top: 1px solid #cbd5e1;            /* 从虚线改淡实线，更清晰 */
+  border-top: 1px solid #cbd5e1;           
   padding-top: 12px;
   margin-top: 12px;
 }
@@ -354,14 +354,14 @@ onMounted(load);
 
 .meta { margin-top: 12px; color: #64748b; font-size: 12px; }
 
-/* 可达性：卡片内可聚焦元素获得柔光圈 */
+/* focus visible */
 .reg-card :focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px rgba(37,99,235,.18);
   border-radius: 6px;
 }
 
-/* 尊重减弱动效偏好 */
+/* reduce motion */
 @media (prefers-reduced-motion: reduce) {
   .reg-card { transition: none; }
   .reg-card:hover, .reg-card:active {

@@ -7,7 +7,7 @@
         Conserve nature
       </h1>
       <div class="cta animate delay">
-        <RouterLink to="/dashboard" class="btn-text">View Dashboard</RouterLink>
+        <RouterLink to="/dashboard" class="btn-text">Click to View Dashboard</RouterLink>
       </div>
     </div>
   </section>
@@ -51,7 +51,7 @@
 .btn-text {
   color: #ffffff;
   font-weight: 600;
-  text-decoration: none;
+  text-decoration: underline;
   padding: 6px 0;
   transition: all 0.3s ease;
 }
