@@ -243,10 +243,13 @@ onMounted(load);
 .input:focus,
 .controls input:focus,
 .controls select:focus {
-  border-color: rgba(37,99,235,1);
+  border-color: rgba(13,155,181,1);
   box-shadow: 0 0 0 4px rgba(37,99,235,.18);
-  transform: translateY(-1px);
+  transform: scale(1.03);
   outline: none;
+  transition: transform .15s ease,                
+              border-color .15s ease,
+              box-shadow .15s ease;
 }
 
 /* Date picker tweaks + button cursor */
@@ -268,17 +271,18 @@ onMounted(load);
 .controls .control:last-child { margin-left: 8px; }
 .btn {
   height: 36px; border-radius: 8px;
-  border: 1.2px solid rgba(37,99,235,1);
-  background: linear-gradient(180deg, rgba(37,99,235,.98) 0%, rgba(37,99,235,.92) 100%);
-  color: #fff; font-weight: 700; letter-spacing: .01em;
+  border: 1px solid rgba(0,0,0,.22);
+  background: #fff;
+  color: #000; font-weight: 700; letter-spacing: .01em;
   transition: background-color .18s ease, box-shadow .2s ease, transform .06s ease, filter .18s ease;
-  box-shadow: 0 6px 16px rgba(37,99,235,.18);
+  box-shadow: 0 6px 16px rgba(0,0,0,.08);
   cursor: pointer;
 }
-.btn:hover:not(:disabled) { filter: brightness(.97); box-shadow: 0 8px 22px rgba(37,99,235,.22); }
-.btn:active:not(:disabled) { transform: translateY(1px); box-shadow: 0 4px 12px rgba(37,99,235,.18); }
+.btn:hover:not(:disabled) { color: rgba(13,155,181,1);text-decoration: underline; transform: scale(1.05);                      /* 稍微放大 5% */
+  box-shadow: 0 6px 16px rgba(13,155,181,.35); border-color: rgba(13,155,181,1); }
+.btn:active:not(:disabled) { transform: scale(0.98); box-shadow: 0 2px 8px rgba(13,155,181,.25); }
 .btn:focus-visible { outline: none; box-shadow: 0 0 0 4px rgba(37,99,235,.18), 0 6px 16px rgba(37,99,235,.18); }
-.btn:disabled { opacity: .55; cursor: not-allowed; filter: none; box-shadow: none; }
+.btn:disabled { opacity: .5; cursor: not-allowed; filter: none; box-shadow: none; }
 
 /* Results & cards (refined) */
 .results h2 { font-size: 20px; margin: 18px 0 12px; }
@@ -331,7 +335,7 @@ onMounted(load);
 
 .pill {
   background: #f3f7ff;                      
-  color: #1d4ed8;
+  color: rgba(13,155,181,1);
   border: 1px solid #c8d7ff;
   padding: 4px 8px;
   font-size: 12px; border-radius: 999px; font-weight: 700;
