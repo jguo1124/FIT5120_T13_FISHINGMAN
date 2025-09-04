@@ -16,7 +16,7 @@
         <div class="avatar">{{ (sp.common_name || sp.species_code).slice(0,1) }}</div>
         <div class="title-wrap">
           <div class="title">{{ sp.common_name || sp.species_code }}</div>
-          <div class="subtitle">{{ sp.scientific_name || '—' }}</div>
+          <div class="subtitle">{{ sp.scientific_name || '-' }}</div>
         </div>
       </div>
 
@@ -55,7 +55,7 @@ const props = defineProps({ sp: { type: Object, required: true } });
 
 // Format ISO date string to locale string
 function formatDate(iso) {
-  if (!iso) return "—";
+  if (!iso) return "-";
   try { return new Date(iso).toLocaleString(); } catch { return iso; }
 }
 

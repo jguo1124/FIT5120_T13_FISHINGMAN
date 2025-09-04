@@ -1,22 +1,15 @@
 <template>
   <div class="page">
-    <!-- Toolbar (unchanged API). We keep your style via :deep selectors below -->
+    <!-- Toolbar with filters -->
     <EsToolbar
       class="es-toolbar"
       :zone="zone"
       :q="q"
       :radius-km="radiusKm"
       @apply="onApply"
-    >
-      <!-- Pager slot intentionally removed because we now use slider UI -->
-      <!--
-      <template #pager>
-        <EsPager :page="page" :total-pages="totalPages" @prev="prevPage" @next="nextPage" />
-      </template>
-      -->
-    </EsToolbar>
+    />
 
-    <!-- Slider area (keyboard, touch, arrows) -->
+    <!-- Slider area -->
     <div
       class="slider"
       tabindex="0"
@@ -26,15 +19,15 @@
       @touchmove="onTouchMove"
       @touchend="onTouchEnd"
     >
-      <!-- Transition wrapper; key changes to trigger page animation -->
+      <!-- Transition wrapper -->
       <transition :name="slideDir" mode="out-in">
         <div class="grid" :key="itemsKey">
-          <!-- Cards -->
+          <!-- Species cards -->
           <EsSpeciesCard v-for="sp in itemsSafe" :key="sp.species_code" :sp="sp" />
 
-          <!-- Robust empty state (works even if items is null/undefined) -->
+          <!-- Empty state: only show if there are no species at all -->
           <div
-            v-if="!loading && itemsSafe.length === 0 && totalPages === 0"
+            v-if="!loading && itemsSafe.length === 0 && totalPages.value === 0"
             class="empty muted"
             style="text-align:center; padding:12px;"
           >
@@ -43,28 +36,29 @@
         </div>
       </transition>
 
-      <!-- Left/Right arrows (shown only when there are multiple pages) -->
+      <!-- Left arrow -->
       <button
-        v-if="totalPages > 1"
+        v-if="tp > 1"
         class="nav nav-left"
         @click="handlePrev"
         :disabled="isPaging || loading || page <= 0"
         aria-label="Previous page"
       >‹</button>
 
+      <!-- Right arrow -->
       <button
-        v-if="totalPages > 1"
+        v-if="tp > 1"
         class="nav nav-right"
         @click="handleNext"
-        :disabled="isPaging || loading || page >= totalPages - 1"
+        :disabled="isPaging || loading || page >= tp - 1"
         aria-label="Next page"
       >›</button>
     </div>
 
-    <!-- Dots indicator (unified with the same loadPage() logic) -->
-    <div class="dots" v-if="totalPages > 1">
+    <!-- Dots -->
+    <div class="dots" v-if="tp > 1">
       <button
-        v-for="i in totalPages"
+        v-for="i in tp"
         :key="'dot-' + i"
         class="dot"
         :class="{ active: (i - 1) === page }"
@@ -78,83 +72,59 @@
 
 <script setup>
 /**
- * This page keeps your original data flow from useSpeciesList():
- * - page is 0-based in this view (disabled conditions use 0 and totalPages-1).
- * - fetchList() pulls the current page; applyFilters() updates query and server-side pagination.
- * The only changes are:
- * - slider UI replaces the old pager UI.
- * - robust empty-state checks and missing touch handlers are added.
+ * Slider-based species list
+ * - Uses useSpeciesList() for zone, q, radius, pagination and data.
+ * - Replaces traditional pager with slider UI (arrows + dots).
+ * - Shows empty state only when no species at all.
  */
 import { ref, computed, onMounted } from "vue";
 import { useSpeciesList } from "@/Composables/useSpeciesList";
 import EsToolbar from "@/components/es/EsToolbar.vue";
-// import EsPager from "@/components/es/EsPager.vue"; // Not used anymore
 import EsSpeciesCard from "@/components/es/EsSpeciesCard.vue";
-import EsEmptyState from "@/components/es/EsEmptyState.vue"; // kept if you prefer to use it later
 
+/* From composable */
 const {
   zone, q, radiusKm, page, totalPages, items, loading,
   fetchList, applyFilters,
 } = useSpeciesList();
 
-/* ---- Local UI state for slider ---- */
-const itemsKey = ref(0);              // Bumps to force transition on page change
-const slideDir = ref("slide-left");   // 'slide-left' or 'slide-right'
-const isPaging = ref(false);          // Concurrency guard to avoid double-requests
-
-/* Safety wrapper so template never crashes if items is null/undefined or non-array */
+/* Safe wrapper for items */
 const itemsSafe = computed(() => Array.isArray(items.value) ? items.value : []);
 
-/**
- * Unified paging function.
- * All navigation (arrows, dots, keyboard, touch) calls this function.
- */
+/* Local UI state */
+const itemsKey = ref(0);              // trigger re-render for transition
+const slideDir = ref("slide-left");   // slide direction
+const isPaging = ref(false);          // prevent concurrent paging
+const tp = computed(() => Math.max(0, Number(totalPages.value) || 0)); // total pages (number)
+
+/* Page navigation */
 async function loadPage(targetIndex) {
   if (isPaging.value) return;
+  if (tp.value <= 0) return;
 
-  // If totalPages is not ready or there is no data at all, just refresh transition once.
-  if (!Number.isFinite(totalPages.value) || totalPages.value <= 0) {
-    slideDir.value = "slide-left";
-    itemsKey.value++;
-    return;
-  }
+  // clamp
+  const clamped = Math.min(Math.max(targetIndex, 0), tp.value - 1);
 
-  // Clamp target to valid range (page is 0-based in this view)
-  const min = 0;
-  const max = Math.max(0, totalPages.value - 1);
-  const clamped = Math.min(Math.max(targetIndex, min), max);
-
-  // Direction decides the transition animation
   slideDir.value = clamped > page.value ? "slide-left" : "slide-right";
 
   isPaging.value = true;
   try {
-    page.value = clamped;   // Set the target page (0-based)
-    await fetchList();      // Pull data for that page
-
-    // If totalPages changed on server (e.g., filters reduced pages) and we are out of range,
-    // snap to the last available page and fetch again.
-    if (page.value > totalPages.value - 1 && totalPages.value > 0) {
-      page.value = totalPages.value - 1;
-      await fetchList();
-    }
-
-    itemsKey.value++;       // Trigger transition after data arrives
+    page.value = clamped;
+    await fetchList();
+    itemsKey.value++;
   } finally {
     isPaging.value = false;
   }
 }
 
-/* Convenience handlers */
 function handlePrev() { loadPage(page.value - 1); }
 function handleNext() { loadPage(page.value + 1); }
 function goTo(idx0)   { loadPage(idx0); }
 
-/* Touch swipe: swipe right = previous page; swipe left = next page */
+/* Touch swipe */
 let touchX = 0, dx = 0, touching = false;
-
 function onTouchStart(e) {
-  if (totalPages.value <= 1) return;  // No-op when there is only one page
+  if (tp.value <= 1) return;
   touching = true;
   touchX = e.touches[0].clientX;
   dx = 0;
@@ -166,23 +136,20 @@ function onTouchMove(e) {
 function onTouchEnd() {
   if (!touching) return;
   touching = false;
-  const threshold = 60; // px
+  const threshold = 60;
   if (dx > threshold) handlePrev();
   else if (dx < -threshold) handleNext();
   dx = 0;
 }
 
-/**
- * Apply filters: reset to page 0, then fetch data, keep transition consistent.
- * This ensures we never land on a stale/empty page after applying filters.
- */
+/* Apply filters: reset to first page */
 async function onApply() {
   slideDir.value = "slide-left";
   isPaging.value = true;
   try {
-    page.value = 0;       // Always start from the first page
-    await applyFilters(); // Server-side filters + update totalPages/items meta
-    await fetchList();    // Fetch page 0 with new filters
+    page.value = 0;
+    await applyFilters();
+    await fetchList();
     itemsKey.value++;
   } finally {
     isPaging.value = false;
@@ -199,7 +166,7 @@ onMounted(async () => {
 <style scoped>
 .page { padding: 16px; background: #f7fafc; min-height: 100vh; color: #0f172a; }
 
-/* Keep your original responsive grid for cards */
+/* Card grid */
 .grid {
   display: grid; gap: 14px; margin-top: 14px;
   grid-template-columns: repeat(5, 1fr);
@@ -209,7 +176,7 @@ onMounted(async () => {
 @media (max-width: 720px)  { .grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 480px)  { .grid { grid-template-columns: 1fr; } }
 
-/* Slider container (clipped area for transitions) */
+/* Slider container */
 .slider {
   position: relative;
   overflow: hidden;
@@ -217,7 +184,7 @@ onMounted(async () => {
   outline: none;
 }
 
-/* Slide transitions */
+/* Slide animations */
 .slide-left-enter-active,
 .slide-left-leave-active,
 .slide-right-enter-active,
@@ -247,50 +214,4 @@ onMounted(async () => {
 .dots { display: flex; gap: 8px; justify-content: center; margin-top: 10px; }
 .dot { width: 8px; height: 8px; border-radius: 999px; background: #cbd5e1; border: none; cursor: pointer; }
 .dot.active { background: rgba(13,155,181,1); }
-
-/* Keep your EsToolbar skin (scoped via :deep) */
-:deep(.es-toolbar .control) { min-width: 0; }
-:deep(.es-toolbar .control label) {
-  display: block; font-size: 12px; color: #475569; margin-bottom: 6px;
-}
-:deep(.es-toolbar .input),
-:deep(.es-toolbar input),
-:deep(.es-toolbar select) {
-  height: 36px;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  padding: 0 10px;
-  outline: none;
-  transition: border-color .15s ease, box-shadow .18s ease, background-color .18s ease, transform .06s ease;
-  -webkit-appearance: none;
-  appearance: none;
-}
-:deep(.es-toolbar .input:hover),
-:deep(.es-toolbar input:hover),
-:deep(.es-toolbar select:hover) { border-color: rgba(148,163,184,.7); }
-:deep(.es-toolbar .input:focus),
-:deep(.es-toolbar input:focus),
-:deep(.es-toolbar select:focus) {
-  border-color: rgba(13,155,181,1);
-  box-shadow: 0 0 0 4px rgba(37,99,235,.18);
-  transform: scale(1.03);
-  outline: none;
-}
-:deep(.es-toolbar .btn) {
-  height: 36px; border-radius: 8px;
-  border: 1px solid rgba(0,0,0,.22);
-  background: #fff; color: #000; font-weight: 700; letter-spacing: .01em;
-  transition: background-color .18s ease, box-shadow .2s ease, transform .06s ease, filter .18s ease, color .15s ease, border-color .15s ease, text-decoration-color .15s ease;
-  box-shadow: 0 6px 16px rgba(0,0,0,.08);
-  cursor: pointer;
-}
-:deep(.es-toolbar .btn:hover:not(:disabled)) {
-  color: rgba(13,155,181,1);
-  text-decoration: underline;
-  transform: scale(1.05);
-  box-shadow: 0 6px 16px rgba(13,155,181,.35);
-  border-color: rgba(13,155,181,1);
-}
-:deep(.es-toolbar .btn:active:not(:disabled)) { transform: scale(0.98); box-shadow: 0 2px 8px rgba(13,155,181,.25); }
-:deep(.es-toolbar .btn:disabled) { opacity: .5; cursor: not-allowed; box-shadow: none; }
 </style>
