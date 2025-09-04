@@ -1,8 +1,7 @@
-// src/services/repo/index.js
-import * as sql from './sql_Repo.js';
+import * as sql from "./sql_Repo.js";
 
-const mode = (process.env.DB_MODE || 'mock').toLowerCase();
-export const repo = mode === 'db' ? sql : mock;
+// 永远只用 db（MySQL）
+export const repo = sql;
 
 export const {
   getSpeciesByCode,
@@ -10,6 +9,6 @@ export const {
   getRuleSnapshot,
   getZoneRulesSnapshotAll,
   getZoneMaxRegVersion,
-} = repo;
+} = sql;
 
-export default repo;
+export default sql;
