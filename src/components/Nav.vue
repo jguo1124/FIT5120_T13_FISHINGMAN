@@ -2,6 +2,7 @@
   <nav class="nav">
     <RouterLink to="/" class="link" active-class="active">Home</RouterLink>
     <RouterLink to="/dashboard" class="link" active-class="active">Dashboard</RouterLink>
+    <RouterLink to="/endangered" class="link"active-class="active">Endangered </RouterLink>
     <RouterLink to="/about" class="link" active-class="active">About</RouterLink>
   </nav>
 </template>
