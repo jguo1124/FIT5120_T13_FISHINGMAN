@@ -1,13 +1,15 @@
-import dotenv from "dotenv";
-dotenv.config();
+// src/services/repo/index.js
+import * as sql from './sql_Repo.js';
 
-const mode = (process.env.DB_MODE || "mock").toLowerCase();
+const mode = (process.env.DB_MODE || 'mock').toLowerCase();
+export const repo = mode === 'db' ? sql : mock;
 
-let repo;
-if (mode === "db") {
-  
-  repo = await import("./prismaRepo.js");
-} else {
-  repo = await import("./mockRepo.js");
-}
+export const {
+  getSpeciesByCode,
+  getZoneByCode,
+  getRuleSnapshot,
+  getZoneRulesSnapshotAll,
+  getZoneMaxRegVersion,
+} = repo;
+
 export default repo;

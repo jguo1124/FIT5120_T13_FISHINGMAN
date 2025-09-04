@@ -1,6 +1,6 @@
 <script setup>
-import { ref, computed, onMounted, watch } from "vue";
-import { fetchZoneRules } from "@/lib/api";
+import { ref, onMounted } from "vue";
+import { fetchZoneRules, fetchSpeciesList } from "@/lib/api";
 
 // Zones (static). If you later expose /zones in backend, fetch here instead.
 const ZONES = [
@@ -12,39 +12,58 @@ const zone = ref(ZONES[0].code);
 const onDate = ref(new Date().toISOString().slice(0, 10)); // 'YYYY-MM-DD'
 const loading = ref(false);
 const errorMsg = ref("");
-const result = ref(null);
 
-// Optional species filter (frontend only)
-const speciesFilter = ref("");
-const speciesOptions = computed(() => {
-  const list = result.value?.species_rules ?? [];
-  const map = new Map();
-  for (const sr of list) {
-    const code = sr.species?.code;
-    const name = sr.species?.common_name || code;
-    if (code && !map.has(code)) map.set(code, name);
-  }
-  return Array.from(map, ([code, name]) => ({ code, name }));
-});
-const displayRules = computed(() => {
-  const list = result.value?.species_rules ?? [];
-  if (!speciesFilter.value) return list;
-  return list.filter((sr) => sr.species?.code === speciesFilter.value);
-});
-watch([zone, onDate], () => (speciesFilter.value = ""));
+// API data
+// When species is selected -> single object; otherwise -> array
+const species = ref("");               // selected species code (optional)
+const speciesOptions = ref([]);        // [{ code, common_name }]
+const resultOne = ref(null);           // single-species result object
+const resultList = ref([]);            // all-species result array
+const zoneRestrictions = ref([]);      // optional: can be shown with both modes
+const meta = ref(null);
 
+// utils
 function fmtDate(dt) {
-  if (!dt) return "-";
+  if (!dt) return "—";
   const d = typeof dt === "string" ? new Date(dt) : dt;
   if (Number.isNaN(d.getTime())) return String(dt);
   return d.toISOString().slice(0, 10);
 }
 
+async function loadSpeciesList() {
+  try {
+    speciesOptions.value = await fetchSpeciesList(); // [{ code, common_name }]
+  } catch (e) {
+    
+    console.warn("Failed to load species list:", e);
+  }
+}
+
 async function load() {
   loading.value = true;
   errorMsg.value = "";
+  resultOne.value = null;
+  resultList.value = [];
+  zoneRestrictions.value = [];
+  meta.value = null;
+
   try {
-    result.value = await fetchZoneRules(zone.value, onDate.value);
+    const data = await fetchZoneRules({
+      zoneCode: zone.value,
+      onDate: onDate.value,
+      species: species.value || undefined,
+    });
+
+    if (species.value) {
+      
+      resultOne.value = data;
+      zoneRestrictions.value = data?.zone_restrictions ?? [];
+    } else {
+      
+      resultList.value = Array.isArray(data) ? data : [];
+      
+      zoneRestrictions.value = resultList.value[0]?.zone_restrictions ?? [];
+    }
   } catch (e) {
     errorMsg.value = e?.message || "Failed to load regulations";
   } finally {
@@ -52,14 +71,17 @@ async function load() {
   }
 }
 
-onMounted(load);
+onMounted(async () => {
+  await loadSpeciesList();
+  await load();
+});
 </script>
 
 <template>
   <section class="dashboard">
     <header class="dash-header">
       <h1>Regulations Dashboard</h1>
-      <p class="subtitle">Select your zone and see all rules for that zone.</p>
+      <p class="subtitle">Select your zone and (optionally) a species to view rules.</p>
     </header>
 
     <div v-if="errorMsg" class="alert error">{{ errorMsg }}</div>
@@ -69,7 +91,7 @@ onMounted(load);
         <label>Zone</label>
         <select v-model="zone" class="input" :disabled="loading">
           <option v-for="z in ZONES" :key="z.code" :value="z.code">
-            {{ z.code }} - {{ z.name }}
+            {{ z.code }} — {{ z.name }}
           </option>
         </select>
       </div>
@@ -81,113 +103,174 @@ onMounted(load);
 
       <div class="control">
         <label>Species (optional)</label>
-        <select v-model="speciesFilter" class="input" :disabled="loading || !speciesOptions.length">
+        <select v-model="species" class="input" :disabled="loading || !speciesOptions.length">
           <option value="">All species</option>
           <option v-for="s in speciesOptions" :key="s.code" :value="s.code">
-            {{ s.code }} - {{ s.name }}
+            {{ s.common_name || s.code }} ({{ s.code }})
           </option>
         </select>
       </div>
 
       <div class="control">
         <label>&nbsp;</label>
-        <button class="btn" :disabled="loading" @click="load">{{ loading ? "Loading..." : "Refresh" }}</button>
+        <button class="btn" :disabled="loading" @click="load">{{ loading ? "Loading…" : "Refresh" }}</button>
       </div>
     </div>
 
     <div class="results">
       <h2>Active Regulations</h2>
 
-      <div v-if="loading" class="skeleton">Loading regulations...</div>
+      <div v-if="loading" class="skeleton">Loading regulations…</div>
 
-      <div v-else-if="!result?.species_rules?.length" class="empty">
-        No regulations found for {{ zone }} on {{ onDate || "today" }}.
-      </div>
-
-      <!-- Zone restrictions -->
-      <div v-if="result?.zone_restrictions?.length" class="reg-card" style="margin-bottom:12px;">
+      <!-- Zone restrictions (show when available) -->
+      <div v-if="!loading && zoneRestrictions?.length" class="reg-card" style="margin-bottom:12px;">
         <div class="reg-head">
           <strong>Zone Restrictions</strong>
-          <span class="zone-at">Zone: <b>{{ result.zone }}</b> · Date: {{ result.at }}</span>
+          <span class="zone-at">Zone: <b>{{ zone }}</b> · Date: {{ onDate }}</span>
         </div>
         <ul style="margin:6px 0 0 16px;">
-          <li v-for="zr in result.zone_restrictions" :key="zr.code + (zr.effective_from||'')">
+          <li v-for="(zr, i) in zoneRestrictions" :key="(zr.code || 'zr') + i">
             <div><span class="tag tag-red">Restriction</span> <b>{{ zr.title }}</b></div>
             <div class="muted">{{ zr.details }}</div>
-            <div class="muted">Effective: {{ zr.effective_from || '-' }} to {{ zr.effective_to || 'open' }}</div>
+            <div class="muted">Effective: {{ zr.effective_from || '—' }} → {{ zr.effective_to || 'open' }}</div>
             <div v-if="zr.references?.length" class="muted">
               Refs:
-              <a v-for="(u,i) in zr.references" :key="i" :href="u" target="_blank" rel="noreferrer">{{ u }}</a>
+              <a v-for="(u, j) in zr.references" :key="j" :href="u" target="_blank" rel="noreferrer">{{ u }}</a>
             </div>
           </li>
         </ul>
       </div>
 
-      <!-- Species rules -->
-      <ul v-if="result?.species_rules?.length" class="reg-list">
-        <li v-for="sr in displayRules" :key="sr.species?.code" class="reg-card">
-          <div class="reg-head">
-            <div class="title">
-              <span class="pill">{{ sr.species?.code?.toUpperCase() || "SPECIES" }}</span>
-              <strong>{{ sr.species?.common_name }}</strong>
-            </div>
-            <div class="zone-at">Zone: <b>{{ sr.zone }}</b> · Date: {{ result.at }}</div>
+      <!-- Single-species view -->
+      <div v-if="!loading && species && resultOne" class="reg-card">
+        <div class="reg-head">
+          <div class="title">
+            <span class="pill">{{ resultOne.species?.code?.toUpperCase() || "SPECIES" }}</span>
+            <strong>{{ resultOne.species?.common_name }}</strong>
           </div>
+          <div class="zone-at">Zone: <b>{{ resultOne.zone?.code || zone }}</b> · Date: {{ onDate }}</div>
+        </div>
 
-          <!-- Size -->
-          <div class="block">
-            <div class="block-head"><span class="tag tag-blue">Size Limit</span></div>
-            <div class="block-body">
-              <template v-if="sr.size_limits?.message">{{ sr.size_limits.message }}</template>
-              <template v-else>
-                Min: {{ sr.size_limits?.min_cm ?? "-" }} cm ·
-                Max: {{ sr.size_limits?.max_cm ?? "No limit" }}
+        <!-- Size -->
+        <div class="block">
+          <div class="block-head"><span class="tag tag-blue">Size Limit</span></div>
+          <div class="block-body">
+            <template v-if="!resultOne.rule">
+              No rule found
+            </template>
+            <template v-else>
+              Min: {{ resultOne.rule.min_cm ?? "—" }} cm ·
+              Max: {{ resultOne.rule.max_cm ?? "No limit" }}
+            </template>
+          </div>
+        </div>
+
+        <!-- Quota -->
+        <div class="block">
+          <div class="block-head"><span class="tag tag-green">Quota</span></div>
+          <div class="block-body">
+            <template v-if="!resultOne.rule">
+              —
+            </template>
+            <template v-else>
+              Daily: {{ resultOne.rule.daily_bag_limit ?? "—" }} ·
+              Seasonal: {{ resultOne.rule.seasonal_limit ?? "—" }}
+              <span v-if="resultOne.rule.season_window">
+                · Period: {{ resultOne.rule.season_window.start }} → {{ resultOne.rule.season_window.end }}
+              </span>
+            </template>
+          </div>
+        </div>
+
+        <!-- Closed seasons -->
+        <div class="block">
+          <div class="block-head"><span class="tag tag-red">Season</span></div>
+          <div class="block-body">
+            <div class="muted" style="margin-top:6px;">
+              <template v-if="resultOne.seasons?.length">
+                Closed ranges:
+                <ul style="margin:6px 0 0 16px;">
+                  <li v-for="r in resultOne.seasons" :key="`${r.from}-${r.to}`">
+                    {{ fmtDate(r.from) }} → {{ fmtDate(r.to) }}
+                  </li>
+                </ul>
               </template>
+              <template v-else>No closed ranges</template>
             </div>
           </div>
+        </div>
+      </div>
 
-          <!-- Quota -->
-          <div class="block">
-            <div class="block-head"><span class="tag tag-green">Quota</span></div>
-            <div class="block-body">
-              <template v-if="sr.quotas?.message">{{ sr.quotas.message }}</template>
-              <template v-else>
-                Daily: {{ sr.quotas?.daily_limit ?? "-" }} ·
-                Seasonal: {{ sr.quotas?.seasonal_limit ?? "-" }}
-                <span v-if="sr.quotas?.season_window">
-                  · Period: {{ sr.quotas.season_window.start }} to {{ sr.quotas.season_window.end }}
-                </span>
-              </template>
+      <!-- All-species view -->
+      <div v-else-if="!loading && !species && resultList.length">
+        <ul class="reg-list">
+          <li v-for="sr in resultList" :key="sr.species?.code" class="reg-card">
+            <div class="reg-head">
+              <div class="title">
+                <span class="pill">{{ sr.species?.code?.toUpperCase() || "SPECIES" }}</span>
+                <strong>{{ sr.species?.common_name }}</strong>
+              </div>
+              <div class="zone-at">Zone: <b>{{ sr.zone?.code || zone }}</b> · Date: {{ onDate }}</div>
             </div>
-          </div>
 
-          <!-- Season -->
-          <div class="block">
-            <div class="block-head"><span class="tag tag-red">Season</span></div>
-            <div class="block-body">
-              <strong>{{ sr.season?.ui_badge }}</strong>
-              <div class="muted" style="margin-top:6px;">
-                <template v-if="sr.season?.closed_ranges?.length">
-                  Closed ranges:
-                  <ul style="margin:6px 0 0 16px;">
-                    <li v-for="r in sr.season.closed_ranges" :key="`${r.from}-${r.to}`">
-                      {{ fmtDate(r.from) }} to {{ fmtDate(r.to) }}
-                    </li>
-                  </ul>
+            <!-- Size -->
+            <div class="block">
+              <div class="block-head"><span class="tag tag-blue">Size Limit</span></div>
+              <div class="block-body">
+                <template v-if="!sr.rule">
+                  No rule found
                 </template>
-                <template v-else>No closed ranges</template>
-                <div v-if="sr.season?.next_closed_range" style="margin-top:4px;">
-                  Next closed: {{ fmtDate(sr.season.next_closed_range.from) }} to
-                  {{ fmtDate(sr.season.next_closed_range.to) }}
+                <template v-else>
+                  Min: {{ sr.rule.min_cm ?? "—" }} cm ·
+                  Max: {{ sr.rule.max_cm ?? "No limit" }}
+                </template>
+              </div>
+            </div>
+
+            <!-- Quota -->
+            <div class="block">
+              <div class="block-head"><span class="tag tag-green">Quota</span></div>
+              <div class="block-body">
+                <template v-if="!sr.rule">
+                  —
+                </template>
+                <template v-else>
+                  Daily: {{ sr.rule.daily_bag_limit ?? "—" }} ·
+                  Seasonal: {{ sr.rule.seasonal_limit ?? "—" }}
+                  <span v-if="sr.rule.season_window">
+                    · Period: {{ sr.rule.season_window.start }} → {{ sr.rule.season_window.end }}
+                  </span>
+                </template>
+              </div>
+            </div>
+
+            <!-- Closed seasons -->
+            <div class="block">
+              <div class="block-head"><span class="tag tag-red">Season</span></div>
+              <div class="block-body">
+                <div class="muted" style="margin-top:6px;">
+                  <template v-if="sr.seasons?.length">
+                    Closed ranges:
+                    <ul style="margin:6px 0 0 16px;">
+                      <li v-for="r in sr.seasons" :key="`${r.from}-${r.to}`">
+                        {{ fmtDate(r.from) }} → {{ fmtDate(r.to) }}
+                      </li>
+                    </ul>
+                  </template>
+                  <template v-else>No closed ranges</template>
                 </div>
               </div>
             </div>
-          </div>
-        </li>
-      </ul>
+          </li>
+        </ul>
+      </div>
 
-      <div v-if="result?.meta" class="meta">
-        version: v{{ result.meta.version_id }} · updated: {{ result.meta.updated_at }}
+      <div v-else-if="!loading" class="empty">
+        No regulations found for {{ zone }} on {{ onDate || "today" }}.
+      </div>
+
+      <div v-if="meta" class="meta">
+        version: v{{ meta.version_id }} · updated: {{ meta.updated_at }}
       </div>
     </div>
   </section>

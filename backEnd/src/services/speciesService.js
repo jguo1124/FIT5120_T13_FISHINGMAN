@@ -1,6 +1,9 @@
 import repo from "./repo/index.js";
 
-// 单物种 （zone_restrictions）
+/**
+ * Get a snapshot of rules for a single species in a specific zone.
+ * Includes base rule + zone-wide restrictions.
+ */
 export async function getRulesSnapshot(code, zoneCode, onDate) {
   const sp = await repo.getSpeciesByCode(code);
   const zone = await repo.getZoneByCode(zoneCode);
@@ -19,7 +22,10 @@ export async function getRulesSnapshot(code, zoneCode, onDate) {
   };
 }
 
-// 遍历所有物种快照 + 区域限制
+/**
+ * Get all rules for a zone.
+ * Iterates through all species and adds zone-wide restrictions.
+ */
 export async function getZoneRules(zoneCode, onDate) {
   const codes = await repo.getAllSpeciesCodes();
   const list = [];
@@ -31,6 +37,9 @@ export async function getZoneRules(zoneCode, onDate) {
   return { zoneRestrictions, list };
 }
 
+/**
+ * Get the latest regulation version ID (global).
+ */
 export async function getCurrentVersionId() {
   return await repo.getCurrentVersionId();
 }

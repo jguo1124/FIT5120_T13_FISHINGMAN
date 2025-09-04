@@ -1,29 +1,39 @@
+// src/routes/species.js
 import { Router } from "express";
-import { getRulesSnapshot, getCurrentVersionId } from "../services/speciesService.js";
+import { getSpeciesByCode } from "../services/repo/index.js";
+import { getPool } from "../services/repo/mysqlPool.js";
 
-const r = Router();
+const router = Router();
 
-r.get("/", (_req, res) => {
-  res.json({ items: ["snapper", "garfish"] });
+/**
+ * GET /api/v1/species
+ * Returns a list of all species with their code and common name.
+ */
+router.get("/", async (req, res, next) => {
+  try {
+    const pool = getPool();
+    const [rows] = await pool.query(
+      "SELECT code, common_name FROM species ORDER BY code"
+    );
+    res.json(rows);
+  } catch (e) {
+    next(e);
+  }
 });
 
-r.get("/:code", async (req, res) => {
-  const { code } = req.params;
-  const { zone, onDate } = req.query;
-
-  if (!zone) return res.status(400).json({ error: { code: "requires_zone" } });
-
-  const out = await getRulesSnapshot(code, String(zone), onDate);
-  if (!out) return res.status(404).json({ error: { code: "species_not_found" } });
-
-  const ver = await getCurrentVersionId();
-
-  res.set("Access-Control-Expose-Headers", "ETag");
-  res.set("ETag", `W/"v${ver}"`);
-
-  out.meta = { ...(out.meta || {}), version_id: ver, updated_at: out.meta?.updated_at || new Date().toISOString() };
-
-  return res.json(out);
+/**
+ * GET /api/v1/species/:code
+ * Returns details for a specific species.
+ * - 404 if the species code does not exist.
+ */
+router.get("/:code", async (req, res, next) => {
+  try {
+    const sp = await getSpeciesByCode(req.params.code);
+    if (!sp) return res.status(404).json({ error: "Not found" });
+    res.json(sp);
+  } catch (e) {
+    next(e);
+  }
 });
 
-export default r;
+export default router;

@@ -1,40 +1,50 @@
+// src/routes/zone.js
 import { Router } from "express";
-import { getZoneRules, getCurrentVersionId } from "../services/speciesService.js";
+import { getRuleSnapshot, getZoneRulesSnapshotAll, getZoneMaxRegVersion } from "../services/repo/index.js";
 
 const router = Router();
-const norm = (s) => String(s || "").trim().replace(/^W\//i, "").replace(/^"+|"+$/g, "");
 
-// GET /api/v1/zone/:zoneCode/rules?onDate=YYYY-MM-DD
-router.get("/zone/:zoneCode/rules", async (req, res) => {
+/**
+ * GET /zone/:zoneCode/rules
+ * Returns fishing rules for a given zone.
+ * - If `species` query is provided → return rules for that species only
+ * - If no `species` query → return rules for all species in that zone
+ * 
+ * Supports ETag-based caching:
+ * - Builds an ETag based on the latest regulation version, zone code, and optional date
+ * - If client sends matching If-None-Match → respond with 304 (Not Modified)
+ */
+router.get("/zone/:zoneCode/rules", async (req, res, next) => {
   try {
     const { zoneCode } = req.params;
-    const onDate = req.query.onDate ? String(req.query.onDate) : undefined;
+    const { species, onDate } = req.query;
 
-    const version = await getCurrentVersionId();
-    const etag = `W/"zone-${zoneCode}-v${version}"`;
-    res.set("Access-Control-Expose-Headers", "ETag");
+    // Compute ETag (weak validator style)
+    const maxVer = await getZoneMaxRegVersion(String(zoneCode));
+    const etag = `W/"rules-v${maxVer}-${zoneCode}-${onDate || ""}"`;
 
-    // Conditional GET → 304
-    const inm = req.headers["if-none-match"];
-    if (typeof inm === "string") {
-      const want = norm(etag);
-      const hit = inm.split(",").some((s) => norm(s) === want || s.trim() === "*");
-      if (hit) { res.set("ETag", etag); return res.status(304).end(); }
+    // Return 304 if client ETag matches
+    const inm = req.header("If-None-Match");
+    if (inm && inm === etag) {
+      res.set("ETag", etag);
+      return res.status(304).end();
     }
 
-    const { zoneRestrictions, list } = await getZoneRules(zoneCode, onDate);
+    let data;
+    if (species) {
+      // Fetch rules for a single species
+      data = await getRuleSnapshot(String(species), String(zoneCode), String(onDate || ""));
+      if (!data) return res.status(404).json({ error: "No data found for species/zone" });
+    } else {
+      // Fetch rules for all species in this zone
+      data = await getZoneRulesSnapshotAll(String(zoneCode), String(onDate || ""));
+      if (!data || data.length === 0) return res.status(404).json({ error: "No data for zone" });
+    }
 
     res.set("ETag", etag);
-    return res.json({
-      zone: zoneCode,
-      at: onDate || new Date().toISOString().slice(0, 10),
-      zone_restrictions: zoneRestrictions,
-      species_rules: list,
-      meta: { version_id: version, updated_at: new Date().toISOString() }
-    });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: { code: "internal_error" } });
+    return res.json(data);
+  } catch (err) {
+    return next(err);
   }
 });
 
