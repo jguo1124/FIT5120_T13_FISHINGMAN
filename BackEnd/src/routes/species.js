@@ -7,13 +7,13 @@ const router = Router();
 
 /**
  * GET /api/v1/species
- * Returns a list of all species with their code and common name.
+ * 返回所有物种。真实库用 FISH 表，没有 common_name，这里用 species 占位到 common_name。
  */
-router.get("/", async (req, res, next) => {
+router.get("/", async (_req, res, next) => {
   try {
     const pool = getPool();
     const [rows] = await pool.query(
-      "SELECT code, common_name FROM species ORDER BY code"
+      "SELECT `species` AS code, `species` AS common_name, `extinction_risk`, `endangered_status` FROM `FISH` ORDER BY `species`"
     );
     res.json(rows);
   } catch (e) {
@@ -23,8 +23,7 @@ router.get("/", async (req, res, next) => {
 
 /**
  * GET /api/v1/species/:code
- * Returns details for a specific species.
- * - 404 if the species code does not exist.
+ * 物种详情（走 repo 内已改好的 getSpeciesByCode → 查 FISH）
  */
 router.get("/:code", async (req, res, next) => {
   try {

@@ -1,6 +1,6 @@
 import * as sql from "./sql_Repo.js";
 
-// 永远只用 db（MySQL）
+
 export const repo = sql;
 
 export const {

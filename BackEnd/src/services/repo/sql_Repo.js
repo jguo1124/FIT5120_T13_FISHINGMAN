@@ -1,308 +1,185 @@
-// src/services/repo/sqlRepo.js
-import { getPool } from './mysqlPool.js';
+// src/services/repo/sql_Repo.js
+// Real DB layout: ZONE / QUOTAS_SPOT / QUOTAS_GENERAL / FISH
+// NOTE: MySQL on Linux/RDS is case-sensitive for table names.
+//       If your tables are lowercase, change the quoted names accordingly
+//       or create views that map to the expected uppercase names.
 
-/** Get species basic info by code */
+import { getPool } from "./mysqlPool.js";
+
+/* ========================= Species ========================= */
+
+/**
+ * Fetch a single species by code from FISH.
+ * FISH has no "common_name"; we return the code and two extra attributes
+ * so the API stays stable for the frontend.
+ */
 export async function getSpeciesByCode(code) {
   const pool = getPool();
   const [rows] = await pool.query(
-    'SELECT code, common_name FROM species WHERE code = ?',
+    "SELECT `species` AS code, `extinction_risk`, `endangered_status` FROM `FISH` WHERE `species` = ?",
     [code]
   );
   return rows[0] || null;
 }
 
-/** Get zone basic info by code */
+/**
+ * List all species (used by /api/v1/species).
+ */
+export async function getSpeciesList() {
+  const pool = getPool();
+  const [rows] = await pool.query(
+    "SELECT `species` AS code, `extinction_risk`, `endangered_status` FROM `FISH` ORDER BY `species` ASC"
+  );
+  return rows;
+}
+
+/* ========================== Zones ========================== */
+
+/**
+ * Fetch a zone by code (code is actually the `fishing_spot` name).
+ */
 export async function getZoneByCode(zoneCode) {
   const pool = getPool();
   const [rows] = await pool.query(
-    'SELECT code FROM zones WHERE code = ?',
+    "SELECT `fishing_spot` AS code, `area` FROM `ZONE` WHERE `fishing_spot` = ?",
     [zoneCode]
   );
   return rows[0] || null;
 }
 
+/* =================== Rules (SPOT + GENERAL) =================== */
+
 /**
- * Snapshot of rules for (species x zone)
- * @returns
- * {
- *   species: { code, common_name },
- *   zone:    { code },
- *   rule: {
- *     min_cm, max_cm, daily_bag_limit, seasonal_limit,
- *     season_window: { start, end } | null
- *   } | null,
- *   seasons: [{ from, to }, ...],
- *   zone_restrictions: [
- *     { code, category, title, details, effective_from, effective_to, references:[], species_codes?:[] }, ...
- *   ]
- * }
+ * Return the "current rules snapshot" for a given zone.
+ *
+ * Merge strategy:
+ *  - If a species exists in QUOTAS_SPOT for the fishing spot → prefer SPOT.
+ *  - Otherwise use QUOTAS_GENERAL. To improve coverage we try multiple scopes:
+ *      (1) exact match:       qg.area_desc = zone.area
+ *      (2) fuzzy match:       qg.area_desc LIKE %zone.area%
+ *      (3) statewide fallback qg.area_desc = 'All Victorian Waters'
+ *  - All rule columns are VARCHAR in the real DB (e.g. "No Limit", "2 Litre").
+ *    We forward them as-is to the frontend.
+ *
+ * @param {string} zoneCode  ZONE.fishing_spot (e.g. "Cape Liptrap Coastal Park")
+ * @param {object} opts      Optional filters, e.g. { species: 'Black Bream' }
+ * @returns {Array<{species, zone_code, area, daily_limit, size_min_cm, size_max_cm, source}>}
  */
-export async function getRuleSnapshot(speciesCode, zoneCode, onDateStr) {
+export async function getZoneRulesSnapshotAll(zoneCode, opts = {}) {
   const pool = getPool();
-  const onDate = onDateStr ? new Date(onDateStr) : new Date(); // reserved for future date-based filters
+  const zone = await getZoneByCode(zoneCode);
+  if (!zone) return [];
 
-  // 1) Validate existence of species & zone
-  const [[species]] = await pool.query(
-    'SELECT code, common_name FROM species WHERE code = ?',
-    [speciesCode]
-  );
-  const [[zone]] = await pool.query(
-    'SELECT code FROM zones WHERE code = ?',
-    [zoneCode]
-  );
-  if (!species || !zone) return null;
+  const area = zone.area;
+  const speciesFilter = (opts.species || "").trim();
 
-  // 2) Main rule (size/quotas/season window) — format dates as strings
-  const [[rule]] = await pool.query(
-    `SELECT
-        size_min_cm,
-        size_max_cm,
-        daily_limit,
-        seasonal_limit,
-        DATE_FORMAT(season_window_start, '%Y-%m-%d') AS season_window_start,
-        DATE_FORMAT(season_window_end,   '%Y-%m-%d') AS season_window_end
-     FROM species_zone_rules
-     WHERE species_code = ? AND zone_code = ?
-     LIMIT 1`,
-    [speciesCode, zoneCode]
+  /* ---------- 1) SPOT rules (highest priority) ---------- */
+  const spotParams = [zoneCode];
+  if (speciesFilter) spotParams.push(speciesFilter);
+
+  const [spotRows] = await pool.query(
+    `
+    SELECT
+      qs.species,
+      qs.daily_limit,
+      qs.min_size_cm AS size_min_cm,
+      qs.max_size_cm AS size_max_cm,
+      'spot' AS source
+    FROM \`QUOTAS_SPOT\` qs
+    WHERE qs.fishing_spot = ?
+      ${speciesFilter ? "AND qs.species = ?" : ""}
+    ORDER BY qs.species ASC
+    `,
+    spotParams
   );
 
-  // 3) Closed seasons (multiple intervals) — format dates as strings
-  const [seasons] = await pool.query(
-    `SELECT
-        DATE_FORMAT(closed_from, '%Y-%m-%d') AS \`from\`,
-        DATE_FORMAT(closed_to,   '%Y-%m-%d')   AS \`to\`
-     FROM species_zone_closed_seasons
-     WHERE species_code = ? AND zone_code = ?
-     ORDER BY closed_from`,
-    [speciesCode, zoneCode]
-  );
+  /* ---------- helper to query GENERAL with different predicates ---------- */
+  async function fetchGeneral(whereSql, whereParams, matchTag) {
+    const params = [...whereParams];
+    if (speciesFilter) params.push(speciesFilter);
+    // prevent duplicates: if a species exists in SPOT, don't return GENERAL for it
+    params.push(zoneCode);
 
-  // 4) Zone-wide restrictions — format dates as strings
-  const [restrictions] = await pool.query(
-    `SELECT
-        id,
-        code,
-        category,
-        title,
-        details,
-        DATE_FORMAT(effective_from, '%Y-%m-%d') AS effective_from,
-        DATE_FORMAT(effective_to,   '%Y-%m-%d') AS effective_to
-     FROM zone_restrictions
-     WHERE zone_code = ?
-     ORDER BY id`,
-    [zoneCode]
-  );
-
-  // 5) Enrich restrictions with references and specific species codes
-  const ids = restrictions.map(r => r.id);
-  const refsByRid = new Map();     // restriction_id -> [url]
-  const speciesByRid = new Map();  // restriction_id -> [species_code]
-
-  if (ids.length > 0) {
-    const placeholders = ids.map(() => '?').join(',');
-
-    const [refs] = await pool.query(
-      `SELECT restriction_id, url
-       FROM zone_restriction_references
-       WHERE restriction_id IN (${placeholders})`,
-      ids
+    const [rows] = await pool.query(
+      `
+      SELECT
+        qg.species,
+        qg.daily_limit,
+        qg.min_size_cm AS size_min_cm,
+        qg.max_size_cm AS size_max_cm,
+        'general' AS source
+      FROM \`QUOTAS_GENERAL\` qg
+      WHERE ${whereSql}
+        ${speciesFilter ? "AND qg.species = ?" : ""}
+        AND NOT EXISTS (
+          SELECT 1 FROM \`QUOTAS_SPOT\` qs
+          WHERE qs.fishing_spot = ? AND qs.species = qg.species
+        )
+      ORDER BY qg.species ASC
+      `,
+      params
     );
-    for (const r of refs) {
-      const list = refsByRid.get(r.restriction_id) || [];
-      list.push(r.url);
-      refsByRid.set(r.restriction_id, list);
-    }
 
-    const [specs] = await pool.query(
-      `SELECT restriction_id, species_code
-       FROM zone_restriction_species
-       WHERE restriction_id IN (${placeholders})`,
-      ids
-    );
-    for (const s of specs) {
-      const list = speciesByRid.get(s.restriction_id) || [];
-      list.push(s.species_code);
-      speciesByRid.set(s.restriction_id, list);
-    }
+    // Attach a non-breaking hint of which fallback matched; safe to ignore on FE.
+    for (const r of rows) r._match = `general:${matchTag}`;
+    return rows;
   }
 
-  const zone_restrictions = restrictions.map(r => ({
-    code: r.code,
-    category: r.category,
-    title: r.title,
-    details: r.details,
-    effective_from: r.effective_from, // 'YYYY-MM-DD' | null
-    effective_to: r.effective_to,     // 'YYYY-MM-DD' | null
-    references: refsByRid.get(r.id) || [],
-    ...(speciesByRid.get(r.id)?.length ? { species_codes: speciesByRid.get(r.id) } : {})
-  }));
+  /* ---------- 2) GENERAL exact (area_desc = zone.area) ---------- */
+  let generalRows = await fetchGeneral("qg.area_desc = ?", [area], "exact");
 
-  // 6) Aggregate result
-  return {
-    species: { code: species.code, common_name: species.common_name },
-    zone: { code: zone.code },
-    rule: rule
-      ? {
-          min_cm: rule.size_min_cm,
-          max_cm: rule.size_max_cm,
-          daily_bag_limit: rule.daily_limit,
-          seasonal_limit: rule.seasonal_limit,
-          season_window:
-            rule.season_window_start && rule.season_window_end
-              ? { start: rule.season_window_start, end: rule.season_window_end }
-              : null
-        }
-      : null,
-    seasons,          // [{ from:'YYYY-MM-DD', to:'YYYY-MM-DD' }]
-    zone_restrictions // [...]
-  };
+  /* ---------- 3) GENERAL fuzzy (LIKE %area%) if still empty ---------- */
+  if (generalRows.length === 0 && area) {
+    generalRows = await fetchGeneral("qg.area_desc LIKE ?", [`%${area}%`], "fuzzy");
+  }
+
+  /* ---------- 4) GENERAL statewide fallback if still empty ---------- */
+  if (generalRows.length === 0) {
+    generalRows = await fetchGeneral(
+      "qg.area_desc = 'All Victorian Waters'",
+      [],
+      "statewide"
+    );
+  }
+
+  /* ---------- Merge: GENERAL first, then override with SPOT ---------- */
+  const merged = new Map();
+  for (const r of generalRows) merged.set(r.species, r);
+  for (const r of spotRows) merged.set(r.species, r);
+
+  /* ---------- Normalize to the FE-friendly shape ---------- */
+  return Array.from(merged.values()).map((r) => ({
+    species: r.species,
+    zone_code: zoneCode,
+    area,
+    daily_limit: r.daily_limit,     // string: e.g. "10" / "No Limit" / "2 Litre"
+    size_min_cm: r.size_min_cm,     // string: e.g. "0" / "28" / "No Limit"
+    size_max_cm: r.size_max_cm,     // string
+    source: r.source,               // 'spot' | 'general' (debug)
+    // compatibility placeholders (kept for old mock-era FE code)
+    seasonal_limit: null,
+    season_window_start: null,
+    season_window_end: null,
+    reg_version: 1,
+    // optional hint for debugging which GENERAL scope matched
+    _match: r._match || (r.source === "spot" ? "spot" : undefined),
+  }));
 }
 
 /**
- * Get the max regulation version for a zone (for ETag generation).
- * Backwards-compatible: if column `reg_version` is missing, fall back to 0.
+ * Fetch a single species rule in a zone.
+ * We reuse the all-rules function with { species } so it benefits from the same
+ * fallback/merge logic as the multi-species query.
  */
-export async function getZoneMaxRegVersion(zoneCode) {
-  const pool = getPool();
-  try {
-    const [[a]] = await pool.query(
-      `SELECT COALESCE(MAX(reg_version),0) AS v
-       FROM species_zone_rules WHERE zone_code = ?`,
-      [zoneCode]
-    );
-    const [[b]] = await pool.query(
-      `SELECT COALESCE(MAX(reg_version),0) AS v
-       FROM zone_restrictions WHERE zone_code = ?`,
-      [zoneCode]
-    );
-    return Math.max(a?.v || 0, b?.v || 0);
-  } catch (err) {
-    // MySQL ER_BAD_FIELD_ERROR (1054) or message containing "Unknown column"
-    if (err?.code === 'ER_BAD_FIELD_ERROR' || /Unknown column 'reg_version'/.test(String(err?.message))) {
-      return 0; // no version column -> fallback
-    }
-    throw err;
-  }
+export async function getRuleSnapshot(zoneCode, speciesCode) {
+  const rows = await getZoneRulesSnapshotAll(zoneCode, { species: speciesCode });
+  return rows[0] || null;
 }
 
 /**
- * Get a zone-wide snapshot for all species.
- * Returns an array where each item represents one species.
+ * Mock-era API exposed a "max regulation version".
+ * Real DB has no notion of versions; return a constant for ETag building.
  */
-export async function getZoneRulesSnapshotAll(zoneCode, onDateStr) {
-  const pool = getPool();
-
-  // 1) Base rules (one row per species)
-  const [rules] = await pool.query(
-    `SELECT
-        r.species_code,
-        s.common_name,
-        r.size_min_cm, r.size_max_cm,
-        r.daily_limit, r.seasonal_limit,
-        DATE_FORMAT(r.season_window_start, '%Y-%m-%d') AS season_window_start,
-        DATE_FORMAT(r.season_window_end,   '%Y-%m-%d') AS season_window_end
-     FROM species_zone_rules r
-     JOIN species s ON s.code = r.species_code
-     WHERE r.zone_code = ?
-     ORDER BY r.species_code`,
-    [zoneCode]
-  );
-  if (rules.length === 0) return [];
-
-  // 2) Batch fetch all closed seasons for involved species
-  const speciesCodes = [...new Set(rules.map(r => r.species_code))];
-  const placeholders = speciesCodes.map(() => '?').join(',');
-  const params = [zoneCode, ...speciesCodes];
-
-  const [seasonsRows] = await pool.query(
-    `SELECT
-        species_code,
-        DATE_FORMAT(closed_from, '%Y-%m-%d') AS \`from\`,
-        DATE_FORMAT(closed_to,   '%Y-%m-%d')   AS \`to\`
-     FROM species_zone_closed_seasons
-     WHERE zone_code = ? AND species_code IN (${placeholders})
-     ORDER BY species_code, closed_from`,
-    params
-  );
-
-  const seasonsBySpecies = new Map();
-  for (const row of seasonsRows) {
-    const list = seasonsBySpecies.get(row.species_code) || [];
-    list.push({ from: row.from, to: row.to });
-    seasonsBySpecies.set(row.species_code, list);
-  }
-
-  // 3) Zone restrictions + references + limited-species bindings
-  const [restrictions] = await pool.query(
-    `SELECT
-        id, code, category, title, details,
-        DATE_FORMAT(effective_from, '%Y-%m-%d') AS effective_from,
-        DATE_FORMAT(effective_to,   '%Y-%m-%d') AS effective_to
-     FROM zone_restrictions
-     WHERE zone_code = ?
-     ORDER BY id`,
-    [zoneCode]
-  );
-
-  const ridList = restrictions.map(r => r.id);
-  const refsByRid = new Map();
-  const speciesByRid = new Map();
-
-  if (ridList.length > 0) {
-    const p2 = ridList.map(() => '?').join(',');
-
-    const [refs] = await pool.query(
-      `SELECT restriction_id, url
-       FROM zone_restriction_references
-       WHERE restriction_id IN (${p2})`,
-      ridList
-    );
-    for (const r of refs) {
-      const list = refsByRid.get(r.restriction_id) || [];
-      list.push(r.url);
-      refsByRid.set(r.restriction_id, list);
-    }
-
-    const [specs] = await pool.query(
-      `SELECT restriction_id, species_code
-       FROM zone_restriction_species
-       WHERE restriction_id IN (${p2})`,
-      ridList
-    );
-    for (const s of specs) {
-      const list = speciesByRid.get(s.restriction_id) || [];
-      list.push(s.species_code);
-      speciesByRid.set(s.restriction_id, list);
-    }
-  }
-
-  const zone_restrictions = restrictions.map(r => ({
-    code: r.code,
-    category: r.category,
-    title: r.title,
-    details: r.details,
-    effective_from: r.effective_from,
-    effective_to: r.effective_to,
-    references: refsByRid.get(r.id) || [],
-    ...(speciesByRid.get(r.id)?.length ? { species_codes: speciesByRid.get(r.id) } : {})
-  }));
-
-  // 4) Output (one item per species)
-  return rules.map(r => ({
-    species: { code: r.species_code, common_name: r.common_name },
-    zone: { code: zoneCode },
-    rule: {
-      min_cm: r.size_min_cm,
-      max_cm: r.size_max_cm,
-      daily_bag_limit: r.daily_limit,
-      seasonal_limit: r.seasonal_limit,
-      season_window:
-        r.season_window_start && r.season_window_end
-          ? { start: r.season_window_start, end: r.season_window_end }
-          : null
-    },
-    seasons: seasonsBySpecies.get(r.species_code) || [],
-    zone_restrictions
-  }));
+export async function getZoneMaxRegVersion() {
+  return 1;
 }
