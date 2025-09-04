@@ -24,7 +24,7 @@ const meta = ref(null);
 
 // utils
 function fmtDate(dt) {
-  if (!dt) return "—";
+  if (!dt) return "-";
   const d = typeof dt === "string" ? new Date(dt) : dt;
   if (Number.isNaN(d.getTime())) return String(dt);
   return d.toISOString().slice(0, 10);
@@ -91,7 +91,7 @@ onMounted(async () => {
         <label>Zone</label>
         <select v-model="zone" class="input" :disabled="loading">
           <option v-for="z in ZONES" :key="z.code" :value="z.code">
-            {{ z.code }} — {{ z.name }}
+            {{ z.code }} - {{ z.name }}
           </option>
         </select>
       </div>
@@ -113,14 +113,14 @@ onMounted(async () => {
 
       <div class="control">
         <label>&nbsp;</label>
-        <button class="btn" :disabled="loading" @click="load">{{ loading ? "Loading…" : "Refresh" }}</button>
+        <button class="btn" :disabled="loading" @click="load">{{ loading ? "Loading..." : "Refresh" }}</button>
       </div>
     </div>
 
     <div class="results">
       <h2>Active Regulations</h2>
 
-      <div v-if="loading" class="skeleton">Loading regulations…</div>
+      <div v-if="loading" class="skeleton">Loading regulations...</div>
 
       <!-- Zone restrictions (show when available) -->
       <div v-if="!loading && zoneRestrictions?.length" class="reg-card" style="margin-bottom:12px;">
@@ -132,7 +132,7 @@ onMounted(async () => {
           <li v-for="(zr, i) in zoneRestrictions" :key="(zr.code || 'zr') + i">
             <div><span class="tag tag-red">Restriction</span> <b>{{ zr.title }}</b></div>
             <div class="muted">{{ zr.details }}</div>
-            <div class="muted">Effective: {{ zr.effective_from || '—' }} → {{ zr.effective_to || 'open' }}</div>
+            <div class="muted">Effective: {{ zr.effective_from || '-' }} to {{ zr.effective_to || 'open' }}</div>
             <div v-if="zr.references?.length" class="muted">
               Refs:
               <a v-for="(u, j) in zr.references" :key="j" :href="u" target="_blank" rel="noreferrer">{{ u }}</a>
@@ -159,7 +159,7 @@ onMounted(async () => {
               No rule found
             </template>
             <template v-else>
-              Min: {{ resultOne.rule.min_cm ?? "—" }} cm ·
+              Min: {{ resultOne.rule.min_cm ?? "-" }} cm ·
               Max: {{ resultOne.rule.max_cm ?? "No limit" }}
             </template>
           </div>
@@ -170,13 +170,13 @@ onMounted(async () => {
           <div class="block-head"><span class="tag tag-green">Quota</span></div>
           <div class="block-body">
             <template v-if="!resultOne.rule">
-              —
+              -
             </template>
             <template v-else>
-              Daily: {{ resultOne.rule.daily_bag_limit ?? "—" }} ·
-              Seasonal: {{ resultOne.rule.seasonal_limit ?? "—" }}
+              Daily: {{ resultOne.rule.daily_bag_limit ?? "-" }} ·
+              Seasonal: {{ resultOne.rule.seasonal_limit ?? "-" }}
               <span v-if="resultOne.rule.season_window">
-                · Period: {{ resultOne.rule.season_window.start }} → {{ resultOne.rule.season_window.end }}
+                · Period: {{ resultOne.rule.season_window.start }} to {{ resultOne.rule.season_window.end }}
               </span>
             </template>
           </div>
@@ -191,7 +191,7 @@ onMounted(async () => {
                 Closed ranges:
                 <ul style="margin:6px 0 0 16px;">
                   <li v-for="r in resultOne.seasons" :key="`${r.from}-${r.to}`">
-                    {{ fmtDate(r.from) }} → {{ fmtDate(r.to) }}
+                    {{ fmtDate(r.from) }} to {{ fmtDate(r.to) }}
                   </li>
                 </ul>
               </template>
@@ -221,7 +221,7 @@ onMounted(async () => {
                   No rule found
                 </template>
                 <template v-else>
-                  Min: {{ sr.rule.min_cm ?? "—" }} cm ·
+                  Min: {{ sr.rule.min_cm ?? "-" }} cm ·
                   Max: {{ sr.rule.max_cm ?? "No limit" }}
                 </template>
               </div>
@@ -232,13 +232,13 @@ onMounted(async () => {
               <div class="block-head"><span class="tag tag-green">Quota</span></div>
               <div class="block-body">
                 <template v-if="!sr.rule">
-                  —
+                  -
                 </template>
                 <template v-else>
-                  Daily: {{ sr.rule.daily_bag_limit ?? "—" }} ·
-                  Seasonal: {{ sr.rule.seasonal_limit ?? "—" }}
+                  Daily: {{ sr.rule.daily_bag_limit ?? "-" }} ·
+                  Seasonal: {{ sr.rule.seasonal_limit ?? "-" }}
                   <span v-if="sr.rule.season_window">
-                    · Period: {{ sr.rule.season_window.start }} → {{ sr.rule.season_window.end }}
+                    · Period: {{ sr.rule.season_window.start }} to {{ sr.rule.season_window.end }}
                   </span>
                 </template>
               </div>
@@ -253,7 +253,7 @@ onMounted(async () => {
                     Closed ranges:
                     <ul style="margin:6px 0 0 16px;">
                       <li v-for="r in sr.seasons" :key="`${r.from}-${r.to}`">
-                        {{ fmtDate(r.from) }} → {{ fmtDate(r.to) }}
+                        {{ fmtDate(r.from) }} to {{ fmtDate(r.to) }}
                       </li>
                     </ul>
                   </template>
