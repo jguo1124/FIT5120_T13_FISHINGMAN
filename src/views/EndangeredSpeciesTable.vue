@@ -1,11 +1,14 @@
 <template>
   <div class="page">
+    <!-- Toolbar (unchanged API). We keep your style via :deep selectors below -->
     <EsToolbar
       class="es-toolbar"
-      :zone="zone" :q="q" :radius-km="radiusKm"
+      :zone="zone"
+      :q="q"
+      :radius-km="radiusKm"
       @apply="onApply"
     >
-      <!--remove pager slot, use built-in buttons and dots instead-->
+      <!-- Pager slot intentionally removed because we now use slider UI -->
       <!--
       <template #pager>
         <EsPager :page="page" :total-pages="totalPages" @prev="prevPage" @next="nextPage" />
@@ -13,7 +16,7 @@
       -->
     </EsToolbar>
 
-    <!-- slider + nav + dots -->
+    <!-- Slider area (keyboard, touch, arrows) -->
     <div
       class="slider"
       tabindex="0"
@@ -23,24 +26,34 @@
       @touchmove="onTouchMove"
       @touchend="onTouchEnd"
     >
-      <!-- animation wrapper -->
+      <!-- Transition wrapper; key changes to trigger page animation -->
       <transition :name="slideDir" mode="out-in">
         <div class="grid" :key="itemsKey">
-          <EsSpeciesCard v-for="sp in items" :key="sp.species_code" :sp="sp" />
-          <EsEmptyState v-if="!loading && items.length===0" />
+          <!-- Cards -->
+          <EsSpeciesCard v-for="sp in itemsSafe" :key="sp.species_code" :sp="sp" />
+
+          <!-- Robust empty state (works even if items is null/undefined) -->
+          <div
+            v-if="!loading && itemsSafe.length === 0 && totalPages === 0"
+            class="empty muted"
+            style="text-align:center; padding:12px;"
+          >
+            No species found. Try another keyword or adjust filters.
+          </div>
         </div>
       </transition>
 
-      <!-- arrow navigation -->
+      <!-- Left/Right arrows (shown only when there are multiple pages) -->
       <button
-        v-if="totalPages>1"
+        v-if="totalPages > 1"
         class="nav nav-left"
         @click="handlePrev"
         :disabled="isPaging || loading || page <= 0"
         aria-label="Previous page"
       >‹</button>
+
       <button
-        v-if="totalPages>1"
+        v-if="totalPages > 1"
         class="nav nav-right"
         @click="handleNext"
         :disabled="isPaging || loading || page >= totalPages - 1"
@@ -48,14 +61,14 @@
       >›</button>
     </div>
 
-    <!-- round page indicators -->
-    <div class="dots" v-if="totalPages>1">
+    <!-- Dots indicator (unified with the same loadPage() logic) -->
+    <div class="dots" v-if="totalPages > 1">
       <button
         v-for="i in totalPages"
-        :key="'dot-'+i"
+        :key="'dot-' + i"
         class="dot"
-        :class="{ active: (i-1) === page }"
-        @click="goTo(i-1)"
+        :class="{ active: (i - 1) === page }"
+        @click="goTo(i - 1)"
         :disabled="isPaging || loading"
         :aria-label="`Go to page ${i}`"
       />
@@ -64,75 +77,129 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from "vue";
+/**
+ * This page keeps your original data flow from useSpeciesList():
+ * - page is 0-based in this view (disabled conditions use 0 and totalPages-1).
+ * - fetchList() pulls the current page; applyFilters() updates query and server-side pagination.
+ * The only changes are:
+ * - slider UI replaces the old pager UI.
+ * - robust empty-state checks and missing touch handlers are added.
+ */
+import { ref, computed, onMounted } from "vue";
 import { useSpeciesList } from "@/Composables/useSpeciesList";
 import EsToolbar from "@/components/es/EsToolbar.vue";
-// import EsPager from "@/components/es/EsPager.vue"; // 不再使用
+// import EsPager from "@/components/es/EsPager.vue"; // Not used anymore
 import EsSpeciesCard from "@/components/es/EsSpeciesCard.vue";
-import EsEmptyState from "@/components/es/EsEmptyState.vue";
+import EsEmptyState from "@/components/es/EsEmptyState.vue"; // kept if you prefer to use it later
 
 const {
   zone, q, radiusKm, page, totalPages, items, loading,
-  fetchList, applyFilters, 
+  fetchList, applyFilters,
 } = useSpeciesList();
 
-/* touch event */
-const itemsKey = ref(0);             
-const slideDir = ref("slide-left");  
-const isPaging = ref(false);         
+/* ---- Local UI state for slider ---- */
+const itemsKey = ref(0);              // Bumps to force transition on page change
+const slideDir = ref("slide-left");   // 'slide-left' or 'slide-right'
+const isPaging = ref(false);          // Concurrency guard to avoid double-requests
 
+/* Safety wrapper so template never crashes if items is null/undefined or non-array */
+const itemsSafe = computed(() => Array.isArray(items.value) ? items.value : []);
+
+/**
+ * Unified paging function.
+ * All navigation (arrows, dots, keyboard, touch) calls this function.
+ */
 async function loadPage(targetIndex) {
   if (isPaging.value) return;
-  if (totalPages.value <= 0) return;
 
-  // clamp target index
+  // If totalPages is not ready or there is no data at all, just refresh transition once.
+  if (!Number.isFinite(totalPages.value) || totalPages.value <= 0) {
+    slideDir.value = "slide-left";
+    itemsKey.value++;
+    return;
+  }
+
+  // Clamp target to valid range (page is 0-based in this view)
   const min = 0;
   const max = Math.max(0, totalPages.value - 1);
   const clamped = Math.min(Math.max(targetIndex, min), max);
 
-  // set direction
+  // Direction decides the transition animation
   slideDir.value = clamped > page.value ? "slide-left" : "slide-right";
 
   isPaging.value = true;
   try {
-    page.value = clamped;   // set page
-    await fetchList();      // pull data
-    itemsKey.value++;       // trigger animation
+    page.value = clamped;   // Set the target page (0-based)
+    await fetchList();      // Pull data for that page
+
+    // If totalPages changed on server (e.g., filters reduced pages) and we are out of range,
+    // snap to the last available page and fetch again.
+    if (page.value > totalPages.value - 1 && totalPages.value > 0) {
+      page.value = totalPages.value - 1;
+      await fetchList();
+    }
+
+    itemsKey.value++;       // Trigger transition after data arrives
   } finally {
     isPaging.value = false;
   }
 }
 
+/* Convenience handlers */
 function handlePrev() { loadPage(page.value - 1); }
 function handleNext() { loadPage(page.value + 1); }
 function goTo(idx0)   { loadPage(idx0); }
 
-/* apply filters */
+/* Touch swipe: swipe right = previous page; swipe left = next page */
+let touchX = 0, dx = 0, touching = false;
+
+function onTouchStart(e) {
+  if (totalPages.value <= 1) return;  // No-op when there is only one page
+  touching = true;
+  touchX = e.touches[0].clientX;
+  dx = 0;
+}
+function onTouchMove(e) {
+  if (!touching) return;
+  dx = e.touches[0].clientX - touchX;
+}
+function onTouchEnd() {
+  if (!touching) return;
+  touching = false;
+  const threshold = 60; // px
+  if (dx > threshold) handlePrev();
+  else if (dx < -threshold) handleNext();
+  dx = 0;
+}
+
+/**
+ * Apply filters: reset to page 0, then fetch data, keep transition consistent.
+ * This ensures we never land on a stale/empty page after applying filters.
+ */
 async function onApply() {
   slideDir.value = "slide-left";
   isPaging.value = true;
   try {
-    page.value = 0;
-    await applyFilters();   
-    await fetchList();   
+    page.value = 0;       // Always start from the first page
+    await applyFilters(); // Server-side filters + update totalPages/items meta
+    await fetchList();    // Fetch page 0 with new filters
     itemsKey.value++;
   } finally {
     isPaging.value = false;
   }
 }
 
+/* Initial load */
 onMounted(async () => {
   await fetchList();
   itemsKey.value++;
-});
-
-watch(items, () => {
 });
 </script>
 
 <style scoped>
 .page { padding: 16px; background: #f7fafc; min-height: 100vh; color: #0f172a; }
 
+/* Keep your original responsive grid for cards */
 .grid {
   display: grid; gap: 14px; margin-top: 14px;
   grid-template-columns: repeat(5, 1fr);
@@ -142,7 +209,7 @@ watch(items, () => {
 @media (max-width: 720px)  { .grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 480px)  { .grid { grid-template-columns: 1fr; } }
 
-/* slider container */
+/* Slider container (clipped area for transitions) */
 .slider {
   position: relative;
   overflow: hidden;
@@ -150,7 +217,7 @@ watch(items, () => {
   outline: none;
 }
 
-/* animation */
+/* Slide transitions */
 .slide-left-enter-active,
 .slide-left-leave-active,
 .slide-right-enter-active,
@@ -162,7 +229,7 @@ watch(items, () => {
 .slide-right-enter-from { transform: translateX(-100%); opacity: .01; }
 .slide-right-leave-to   { transform: translateX(20%);  opacity: 0; }
 
-/* arrow navigation */
+/* Arrow buttons */
 .nav {
   position: absolute; top: 50%; transform: translateY(-50%);
   width: 36px; height: 36px; border-radius: 50%;
@@ -176,11 +243,12 @@ watch(items, () => {
 .nav:hover { color: rgba(13,155,181,1); border-color: rgba(13,155,181,1); }
 .nav:disabled { opacity: .4; cursor: not-allowed; }
 
-/* page dots */
+/* Dots */
 .dots { display: flex; gap: 8px; justify-content: center; margin-top: 10px; }
 .dot { width: 8px; height: 8px; border-radius: 999px; background: #cbd5e1; border: none; cursor: pointer; }
 .dot.active { background: rgba(13,155,181,1); }
 
+/* Keep your EsToolbar skin (scoped via :deep) */
 :deep(.es-toolbar .control) { min-width: 0; }
 :deep(.es-toolbar .control label) {
   display: block; font-size: 12px; color: #475569; margin-bottom: 6px;
