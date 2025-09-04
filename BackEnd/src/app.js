@@ -31,9 +31,16 @@ app.use((req, res, next) => {
 // Parse JSON bodies
 app.use(express.json());
 
+/** 
+ * Light health check for Render 
+ * (does not depend on database)
+ */
+app.get("/healthz", (_, res) => {
+  res.send("ok");
+});
+
 /**
- * Health check endpoint
- * Queries the database with `SELECT 1` to verify connectivity.
+ * Database health check
  */
 app.get("/api/v1/health", async (_, res) => {
   try {
