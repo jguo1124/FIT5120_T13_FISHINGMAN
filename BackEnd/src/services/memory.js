@@ -1,7 +1,7 @@
-// 简单内存会话存储：Map<sessionId, {messages: Array, updatedAt: number}>
+// Simple in-memory session storage: Map<sessionId, {messages: Array, updatedAt: number}>
 const store = new Map();
 
-const MAX_TURNS = 15;  // 保存最近 15 轮（user+assistant 视作2条）
+const MAX_TURNS = 15;  // Keep recent 15 turns (user+assistant counts as 2)
 const SYSTEM_PROMPT = `
 You are GoFish Assistant, a friendly helper for a website about recreational fishing in Victoria, Australia.
 Your job:
@@ -10,7 +10,7 @@ Your job:
 - If unsure or outside scope, say so briefly and suggest checking official references.
 - Keep answers concise, structured, and beginner-friendly.
 - When users upload an image, first describe it, then relate to possible fishing rules if relevant.
-Return Chinese answers when the user speaks Chinese; otherwise reply in English.
+Always reply in English only.
 `;
 
 export function getSession(sessionId) {
@@ -32,7 +32,7 @@ export function upsertMessage(sessionId, msg) {
     if (!s) s = initSession(sessionId);
     s.messages.push(msg);
     s.updatedAt = Date.now();
-    // 截断到最近 MAX_TURNS（保留开头的 system）
+    // Truncate to recent MAX_TURNS (keep the system message at the beginning)
     const sys = s.messages[0];
     const tail = s.messages.slice(1).slice(-MAX_TURNS * 2);
     s.messages = [sys, ...tail];

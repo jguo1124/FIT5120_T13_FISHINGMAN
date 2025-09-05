@@ -1,53 +1,65 @@
+// src/app.js
 import express from "express";
 import cors from "cors";
-import morgan from "morgan";
-import swaggerUi from "swagger-ui-express";
-import swaggerJsdoc from "swagger-jsdoc";
-import aiRouter from "./routes/ai.js";
-import path from "path";
-import { fileURLToPath } from "url";
+import helmet from "helmet";
+import dotenv from "dotenv";
 
-const PORT = 8080; // <- 端口写死，改这里即可
+// Import routers
+import aiRouter from "./routes/ai.js";
+
+
+dotenv.config();
 
 const app = express();
-app.use(cors());
-app.use(express.json({ limit: "10mb" }));
-app.use(morgan("dev"));
 
-// Swagger 文档
-const swaggerSpec = swaggerJsdoc({
-  definition: {
-    openapi: "3.0.3",
-    info: { title: "FishingMan API", version: "0.1.0" },
-    servers: [{ url: `http://localhost:${PORT}` }]
-  },
-  apis: ["./src/routes/*.js"] // 注意这里加了 src
+app.use(helmet());
+app.use(
+  cors({
+    origin: true,
+    exposedHeaders: ["ETag"],
+  })
+);
+
+// Ensure ETag header is exposed to the client
+app.use((req, res, next) => {
+  res.set("Access-Control-Expose-Headers", "ETag");
+  next();
 });
 
-app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+// Parse JSON bodies
+app.use(express.json());
 
-// 健康检查
-app.get("/api/ping", (req, res) => res.json({ ok: true, ts: Date.now() }));
-
-// 业务路由
-app.use("/api/ai", aiRouter);
-
-// ---- 静态站点（Home 页）----
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const publicDir = path.join(__dirname, "../public");
-app.use(express.static(publicDir));
-app.get(["/", "/home"], (req, res) => {
-  res.sendFile(path.join(publicDir, "index.html"));
+/**
+ * Health check endpoint
+ */
+app.get("/api/v1/health", async (_, res) => {
+  try {
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ ok: false, error: String(err) });
+  }
 });
 
-// 统一错误处理
+// Mount routers
+app.use("/api/ai", aiRouter);              // e.g. /api/ai/chat, /api/ai/stream
+
+// Global error handler
 app.use((err, req, res, next) => {
-  console.error("ERR:", err);
-  res.status(500).json({ error: err?.message || "Server error" });
+  console.error("Unhandled error:", err);
+  res.status(500).json({
+    error: {
+      code: "internal_error",
+      message: process.env.NODE_ENV === "production" ? "Server error" : String(err?.message || err),
+      stack: process.env.NODE_ENV === "production" ? undefined : err?.stack,
+    },
+  });
 });
 
-app.listen(PORT, () => {
-  console.log(`✅ Server:  http://localhost:${PORT}`);
-  console.log(`📚 Swagger: http://localhost:${PORT}/docs`);
-});
+export default app;
+
+// Start server unless running in test mode
+if (process.env.NODE_ENV !== "test") {
+  const port = process.env.PORT || 8080;
+  app.listen(port, () => console.log(`API on http://localhost:${port}`));
+}

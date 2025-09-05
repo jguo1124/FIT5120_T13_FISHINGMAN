@@ -7,22 +7,22 @@ import {
 
 const router = Router();
 
-// ---- DashScope OpenAI 兼容端点（写死 Key）----
+// ---- DashScope OpenAI Compatible Endpoint (Hardcoded Key) ----
 const DASH_SCOPE_API_KEY = "sk-0103ece78f5740c3b35882dff89bc7b5";
 const openai = new OpenAI({
     apiKey: DASH_SCOPE_API_KEY,
     baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1"
 });
 
-// 上传（内存）用于 chat-upload
+// Upload (in-memory) for chat-upload
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 7 * 1024 * 1024 } });
 
-// ====== 1) Echo：测试 ======
+// ====== 1) Echo: Test ======
 /**
  * @openapi
  * /api/ai/echo:
  *   post:
- *     summary: Echo 测试（验证路由/Swagger）
+ *     summary: Echo test (verify routing/Swagger)
  *     tags: [AI]
  *     requestBody:
  *       required: true
@@ -37,12 +37,12 @@ router.post("/echo", (req, res) => {
     res.json({ message: req.body?.message ?? null });
 });
 
-// ====== 2) 重置会话 ======
+// ====== 2) Reset Session ======
 /**
  * @openapi
  * /api/ai/session/reset:
  *   post:
- *     summary: 重置指定会话
+ *     summary: Reset specified session
  *     tags: [AI]
  *     requestBody:
  *       required: true
@@ -61,12 +61,12 @@ router.post("/session/reset", (req, res) => {
     res.json({ ok: true });
 });
 
-// ====== 3) 文本/图片（URL）对话：带会话记忆（非流式）======
+// ====== 3) Text/Image (URL) Chat: With Session Memory (Non-streaming) ======
 /**
  * @openapi
  * /api/ai/chat:
  *   post:
- *     summary: 文本/图片URL对话（非流式，带会话记忆）
+ *     summary: Text/Image URL chat (non-streaming, with session memory)
  *     tags: [AI]
  *     requestBody:
  *       required: true
@@ -75,7 +75,7 @@ router.post("/session/reset", (req, res) => {
  *           schema:
  *             type: object
  *             properties:
- *               prompt: { type: string, example: "我在你们网站哪里看受保护物种？" }
+ *               prompt: { type: string, example: "Where can I find protected species information on your website?" }
  *               imageUrl: { type: string, example: "https://..." }
  *               sessionId: { type: string, example: "web-abc123" }
  *             required: [prompt, sessionId]
@@ -95,7 +95,7 @@ router.post("/chat", async (req, res, next) => {
 
         const session = ensureSession(sessionId);
 
-        // 组装本轮 user 内容
+        // Assemble current user content
         const userContent = [];
         if (imageUrl) userContent.push({ type: "image_url", image_url: { url: imageUrl } });
         userContent.push({ type: "text", text: prompt });
@@ -116,12 +116,12 @@ router.post("/chat", async (req, res, next) => {
     } catch (e) { next(e); }
 });
 
-// ====== 4) 本地图片上传 + 文本（带会话记忆）======
+// ====== 4) Local Image Upload + Text (With Session Memory) ======
 /**
  * @openapi
  * /api/ai/chat-upload:
  *   post:
- *     summary: 表单上传图片 + 文本（非流式，带会话记忆）
+ *     summary: Form upload image + text (non-streaming, with session memory)
  *     tags: [AI]
  *     requestBody:
  *       required: true
@@ -131,7 +131,7 @@ router.post("/chat", async (req, res, next) => {
  *             type: object
  *             properties:
  *               sessionId: { type: string }
- *               prompt: { type: string, example: "请描述图片并判断是否涉及受保护物种" }
+ *               prompt: { type: string, example: "Please describe the image and determine if it involves protected species" }
  *               file: { type: string, format: binary }
  *             required: [sessionId, prompt, file]
  *     responses: { 200: { description: OK } }
@@ -169,12 +169,12 @@ router.post("/chat-upload", upload.single("file"), async (req, res, next) => {
     } catch (e) { next(e); }
 });
 
-// ====== 5) 文本/图片 对话（流式，SSE，带会话记忆）======
+// ====== 5) Text/Image Chat (Streaming, SSE, With Session Memory) ======
 /**
  * @openapi
  * /api/ai/stream:
  *   post:
- *     summary: 文本/图片对话（流式输出，带会话记忆）
+ *     summary: Text/Image chat (streaming output, with session memory)
  *     tags: [AI]
  *     requestBody:
  *       required: true
@@ -184,7 +184,7 @@ router.post("/chat-upload", upload.single("file"), async (req, res, next) => {
  *             type: object
  *             properties:
  *               sessionId: { type: string, example: "web-123" }
- *               prompt: { type: string, example: "请介绍一下你们网站的Dashboard功能" }
+ *               prompt: { type: string, example: "Please introduce the Dashboard features of your website" }
  *               imageUrl: { type: string, example: "" }
  *             required: [sessionId, prompt]
  *     responses:
@@ -205,7 +205,7 @@ router.post("/stream", async (req, res) => {
         userContent.push({ type: "text", text: prompt });
         upsertMessage(sessionId, { role: "user", content: userContent });
 
-        // SSE 头
+        // SSE headers
         res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
         res.setHeader("Cache-Control", "no-cache, no-transform");
         res.setHeader("Connection", "keep-alive");
