@@ -58,21 +58,40 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { useUserStore } from '@/stores/user'
+
+const userStore = useUserStore()
+const router = useRouter()
 
 const openLogin = ref(false)
 const openRegister = ref(false)
 
 const loginEmail = ref('')
 const loginPassword = ref('')
+const registerName = ref('')
 const registerEmail = ref('')
 const registerPassword = ref('')
 
+
 const handleLogin = () => {
-  console.log('Login:', loginEmail.value, loginPassword.value)
-  openLogin.value = false
+  const savedName = localStorage.getItem('userName')
+  const savedEmail = localStorage.getItem('userEmail')
+  const savedPassword = localStorage.getItem('userPassword')
+
+  if (loginEmail.value === savedEmail && loginPassword.value === savedPassword) {
+    userStore.login(savedName || '', savedEmail || '')
+    openLogin.value = false
+    router.push('/')
+  } else {
+    alert('Login failed! Wrong email or password.')
+  }
 }
 const handleRegister = () => {
-  console.log('Register:', registerEmail.value, registerPassword.value)
+  localStorage.setItem('userName', registerName.value)
+  localStorage.setItem('userEmail', registerEmail.value)
+  localStorage.setItem('userPassword', registerPassword.value)
+  alert('Register success! You can login now.')
   openRegister.value = false
 }
 
