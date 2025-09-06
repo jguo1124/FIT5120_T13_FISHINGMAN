@@ -1,3 +1,4 @@
+<!-- src/components/ControlsBar.vue -->
 <script setup>
 /**
  * Props:
@@ -30,10 +31,11 @@ const emit = defineEmits([
 </script>
 
 <template>
-  <div class="controls">
+  <div class="controls" role="group" aria-label="Filters">
     <div class="control">
-      <label>Zone</label>
+      <label for="zone">Zone</label>
       <select
+        id="zone"
         class="input"
         :disabled="loading"
         :value="zone"
@@ -46,8 +48,9 @@ const emit = defineEmits([
     </div>
 
     <div class="control">
-      <label>Date</label>
+      <label for="date">Date</label>
       <input
+        id="date"
         type="date"
         class="input"
         :disabled="loading"
@@ -57,8 +60,9 @@ const emit = defineEmits([
     </div>
 
     <div class="control">
-      <label>Species (optional)</label>
+      <label for="species">Species (optional)</label>
       <select
+        id="species"
         class="input"
         :disabled="loading || !speciesOptions.length"
         :value="species"
@@ -84,8 +88,8 @@ const emit = defineEmits([
       </label>
     </div>
 
-    <div class="control">
-      <label>&nbsp;</label>
+    <div class="control last">
+      <label aria-hidden="true">&nbsp;</label>
       <button class="btn" :disabled="loading" @click="emit('refresh')">
         {{ loading ? "Loading…" : "Refresh" }}
       </button>
@@ -94,21 +98,80 @@ const emit = defineEmits([
 </template>
 
 <style scoped>
+/* Responsive grid with enough min width to prevent overlap */
 .controls {
-  display:grid;
-  grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) auto auto;
-  column-gap:16px; row-gap:12px; align-items:end; margin-bottom:18px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  column-gap: 16px;
+  row-gap: 16px;
+  align-items: end;
+  margin-bottom: 18px;
 }
-.control { min-width:0; }
-.control label { display:block; font-size:12px; color:#475569; margin-bottom:6px; }
+
+.control { min-width: 0; }
+
+.control label {
+  display: block;
+  font-size: 12px;
+  color: #475569;
+  margin-bottom: 6px;
+}
+
 .input {
-  width:100%; height:36px; border:1px solid #cbd5e1; border-radius:8px; padding:0 10px;
-  outline:none;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 0 10px;
+  outline: none;
+  background: #fff;
 }
-.toggle { display:flex; align-items:center; gap:8px; }
+
+/* Checkbox + label */
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: auto;
+  white-space: nowrap; /* avoid multi-line wrapping that pushes layout */
+}
+
+.toggle input {
+  width: 16px;
+  height: 16px;
+}
+
+/* Refresh button */
+.control.last { min-width: 140px; }
+
 .btn {
-  height:36px; border-radius:8px; border:1px solid rgba(0,0,0,.22);
-  background:#fff; font-weight:700; box-shadow:0 6px 16px rgba(0,0,0,.08); cursor:pointer;
+  width: 100%;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid rgba(0,0,0,.22);
+  background: #fff;
+  font-weight: 700;
+  box-shadow: 0 6px 16px rgba(0,0,0,.08);
+  cursor: pointer;
 }
-.btn:hover:not(:disabled){ color:#0d9bb5; text-decoration:underline; transform:scale(1.03); }
+
+.btn:hover:not(:disabled) {
+  color: #0d9bb5;
+  text-decoration: underline;
+  transform: scale(1.02);
+}
+
+.btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Break the toggle to its own row when space is tight */
+@media (max-width: 1100px) {
+  .toggle { grid-column: 1 / -1; }
+}
+
+/* Refresh button also full row on very small screens */
+@media (max-width: 420px) {
+  .control.last { grid-column: 1 / -1; }
+}
 </style>
