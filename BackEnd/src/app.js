@@ -7,6 +7,7 @@ import dotenv from "dotenv";
 // Import routers
 import speciesRouter from "./routes/species.js";
 import zoneRouter from "./routes/zone.js";
+import weatherRouter from "./routes/weather.js";
 
 import { getPool } from "./services/repo/mysqlPool.js";
 
@@ -56,6 +57,7 @@ app.get("/api/v1/health", async (_, res) => {
 // Mount routers
 app.use("/api/v1/species", speciesRouter); // e.g. /api/v1/species/:code
 app.use("/api/v1", zoneRouter);            // e.g. /api/v1/zone/:zoneCode/rules
+app.use("/api/v1/weather", weatherRouter); // e.g. /api/v1/weather/onecall
 
 // Global error handler
 app.use((err, req, res, next) => {
