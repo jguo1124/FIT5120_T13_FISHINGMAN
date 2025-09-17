@@ -2,19 +2,40 @@
 import mysql from 'mysql2/promise';
 import 'dotenv/config';
 
-let pool;
+const pools = {};
 
-export function getPool() {
-  if (pool) return pool;
+/**
+ * Returns a MySQL connection pool.
+ *
+ * Usage (backward compatible):
+ *   - getPool()        → defaults to "real" (DATABASE_URL_REAL or DATABASE_URL)
+ *   - getPool("real")  → explicitly connect to the real database
+ *   - getPool("mock")  → explicitly connect to the mock database
+ *
+ * @param {string} [which="real"] - Pool type: "real" or "mock".
+ * @returns {Pool} A mysql2/promise connection pool.
+ */
+export function getPool(which = 'real') {
+  if (pools[which]) return pools[which];
 
-  const url = process.env.DATABASE_URL;
-  if (!url) throw new Error('DATABASE_URL not set');
+  // 1) Resolve connection string
+  let url;
+  if (which === 'real') {
+    // Prefer DATABASE_URL_REAL; fallback to DATABASE_URL for backward compatibility
+    url = process.env.DATABASE_URL_REAL || process.env.DATABASE_URL;
+  } else if (which === 'mock') {
+    url = process.env.DATABASE_URL_MOCK;
+  } else {
+    throw new Error(`Unknown pool name: ${which}`);
+  }
+  if (!url) throw new Error(`${which.toUpperCase()} database url not set`);
 
-  
-  pool = mysql.createPool(url, {
+  // 2) Create pool from connection string (mysql2 supports URI format)
+  pools[which] = mysql.createPool(url, {
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
+    // If RDS requires SSL, enable: ssl: { rejectUnauthorized: true }
   });
-  return pool;
+  return pools[which];
 }

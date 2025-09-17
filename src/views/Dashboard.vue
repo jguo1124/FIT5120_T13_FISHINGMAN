@@ -145,22 +145,49 @@ watch(onDate, (v) => {
   if (zone.value && v) step.value = 3;
 });
 
+const stepPills = computed(() => ([
+  { id: 1, label: "Zone", icon: "📍", state: step.value >= 1 ? (step.value > 1 ? "done" : "current") : "todo" },
+  { id: 2, label: "Date", icon: "🗓️", state: step.value >= 2 ? (step.value > 2 ? "done" : "current") : "todo" },
+  { id: 3, label: "Species", icon: "🐟", state: step.value >= 3 ? "current" : "todo" },
+]));
+
 // Init
 onMounted(loadZones);
 </script>
 
 <template>
   <section class="dashboard">
-    <header class="dash-header">
-      <h1>Regulations Dashboard</h1>
-      <p class="subtitle">
-        Select a zone and date to view all species; optionally filter by species.
-      </p>
+    <!-- top hero with title and subtitle -->
+    <header class="dash-hero wave-bg">
+      <div class="dash-hero__inner">
+        <h1>Regulations Dashboard</h1>
+        <p class="subtitle">
+          Select a zone and date to view all species; optionally filter by species.
+        </p>
+      </div>
     </header>
+
+    <!-- steps pills -->
+    <nav class="pills">
+      <ol class="pills__list">
+        <li
+          v-for="p in stepPills"
+          :key="p.id"
+          class="pills__item"
+          :data-state="p.state"
+        >
+          <span class="pills__num">
+            <span>{{ p.id }}</span>
+          </span>
+          <span class="pills__icon" aria-hidden="true">{{ p.icon }}</span>
+          <span class="pills__label">{{ p.label }}</span>
+        </li>
+      </ol>
+    </nav>
 
     <div v-if="errorMsg" class="alert error">{{ errorMsg }}</div>
 
-    <!-- Centered card for the step-by-step controls -->
+    <!-- middle controls card -->
     <div class="wizard-card">
       <WizardControls
         :zones="zones"
@@ -177,10 +204,11 @@ onMounted(loadZones);
       />
     </div>
 
+    <!-- results -->
     <div class="results">
       <h2>Active Regulations</h2>
 
-      <div v-if="loading" class="skeleton">Loading regulations…</div>
+      <div v-if="loading" class="skeleton">Loading regulations...</div>
 
       <RegList
         v-else
@@ -198,7 +226,7 @@ onMounted(loadZones);
         v-else-if="!loading && step >= 3 && !listForRender.length"
         class="empty"
       >
-        No regulations found for {{ zone }} on {{ onDate || "—" }}.
+        No regulations found for {{ zone }} on {{ onDate || "-" }}.
       </div>
     </div>
   </section>
@@ -213,22 +241,94 @@ onMounted(loadZones);
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
 }
 
-/* Title */
-.dash-header h1 {
-  font-size: clamp(22px, 3.6vw, 28px);
-  font-weight: 800;
-  margin: 0 0 6px;
-  letter-spacing: -0.01em;
-  line-height: 1.25;
-}
-.subtitle {
-  color: #64748b;
-  margin: 0 0 20px;
-  line-height: 1.6;
-  max-width: 68ch;
+/* banner-like hero */
+.dash-hero {
+  border-radius: 14px;
+  padding: 16px 18px;
+  margin: 0 0 10px;
+  box-shadow: 0 4px 14px rgba(59,130,246,0.06), 0 1px 2px rgba(0,0,0,0.04);
 }
 
-/* Center card for controls */
+/* centered inner content */
+.dash-hero__inner {
+  max-width: 880px;
+  margin: 0 auto;
+}
+
+/* background wave pattern */
+.wave-bg {
+  background:
+    radial-gradient(120% 60% at 50% 0%, rgba(59,130,246,.12) 0%, rgba(59,130,246,0) 60%),
+    repeating-linear-gradient(
+      135deg,
+      rgba(59,130,246,.08) 0 10px,
+      rgba(59,130,246,0) 10px 26px
+    );
+}
+.dash-hero h1 {
+  font-size: clamp(22px, 3.4vw, 28px);
+  font-weight: 800;
+  margin: 0 0 4px;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  color: #0f172a; 
+}
+
+.subtitle {
+  color: #475569;         
+  margin: 0;
+  line-height: 1.5;
+  max-width: 65ch;
+  font-size: clamp(13px, 1.4vw, 15px);
+}
+
+.pills { margin-top: 10px; }
+
+/* steps pills */
+.pills__list {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: clamp(10px, 2vw, 16px);
+  max-width: 880px;      
+  margin-left: auto;
+  margin-right: auto;
+  justify-items: start;   
+}
+.pills__item {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: #fff;
+  border: 1px solid #eef2f7;
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.04);
+}
+.pills__num {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: rgba(89, 195, 214, 0.28);          
+  color: #21c8e5;              
+  border: 2px solid #21c8e5;    
+  font-weight: 800;
+}
+.pills__icon { font-size: 18px; }
+.pills__label {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.pills__item[data-state="current"] {
+  outline: 2px solid rgba(59,130,246,.18);
+  outline-offset: 0;
+  box-shadow: 0 1px 2px rgba(59,130,246,.10);
+}
+.pills__item[data-state="done"] .pills__label { color: #1f2937; }
+
 .wizard-card {
   max-width: 820px;
   margin: 12px auto 20px;
@@ -236,17 +336,16 @@ onMounted(loadZones);
   border: 1px solid #e5e7eb;
   border-radius: 14px;
   background: #fff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, .05), 0 10px 24px rgba(0, 0, 0, .06);
+  box-shadow: 0 1px 2px rgba(0,0,0,.05), 0 10px 24px rgba(0,0,0,.06);
 }
 
-/* States */
 .alert.error {
   background: #fee2e2;
   color: #991b1b;
   border: 1px solid #fecaca;
   padding: 10px 12px;
   border-radius: 10px;
-  margin-bottom: 16px;
+  margin: 10px 0 14px;
 }
 .results h2 { font-size: 20px; margin: 18px 0 12px; }
 .skeleton, .empty {
@@ -257,7 +356,12 @@ onMounted(loadZones);
   background: linear-gradient(180deg, #fff 0%, #fbfcff 100%);
 }
 
-/* Small screens */
+@media (max-width: 720px) {
+  .pills__list{
+    grid-template-columns: 1fr;
+    max-width: 560px;     
+  }
+}
 @media (max-width: 360px) {
   .dashboard { padding: 20px 12px; }
 }

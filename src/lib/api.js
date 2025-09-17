@@ -48,17 +48,17 @@ function buildUrl(path, params) {
   return url.toString();
 }
 
-/** GET /species → list of species [{ code, common_name, ... }] */
+/** GET /species to list of species [{ code, common_name, ... }] */
 export async function fetchSpeciesList() {
   return getJson(buildUrl("/species"));
 }
 
-/** GET /species/:code → details for a species */
+/** GET /species/:code to details for a species */
 export async function fetchSpeciesDetail(code) {
   return getJson(buildUrl(`/species/${encodeURIComponent(code)}`));
 }
 
-/** GET /zones → list all fishing spots [{ code, area }] */
+/** GET /zones to list all fishing spots [{ code, area }] */
 export async function fetchZones() {
   return getJson(buildUrl("/zones"));
 }

@@ -4,9 +4,14 @@ import cors from "cors";
 import helmet from "helmet";
 import dotenv from "dotenv";
 
-// Import routers
+// Epic 1 routers
 import speciesRouter from "./routes/species.js";
 import zoneRouter from "./routes/zone.js";
+
+// Epic 2 routers
+import protectedRouter from "./Endangered_species/routes.js";
+
+
 import weatherRouter from "./routes/weather.js";
 
 import { getPool } from "./services/repo/mysqlPool.js";
@@ -15,57 +20,88 @@ dotenv.config();
 
 const app = express();
 
+// Security middleware
 app.use(helmet());
 app.use(
   cors({
-    origin: true,
+    origin: process.env.CORS_ORIGIN?.split(",") || true,
     exposedHeaders: ["ETag"],
   })
 );
 
-// Ensure ETag header is exposed to the client
-app.use((req, res, next) => {
+app.use((_, res, next) => {
   res.set("Access-Control-Expose-Headers", "ETag");
   next();
 });
-
-// Parse JSON bodies
 app.use(express.json());
 
-/** 
- * Light health check for Render 
- * (does not depend on database)
+/**
+ * Lightweight health check (does not depend on DB).
  */
-app.get("/healthz", (_, res) => {
-  res.send("ok");
-});
+app.get("/healthz", (_, res) => res.send("ok"));
 
 /**
- * Database health check
+ * Health check for the real database (Epic 1).
  */
 app.get("/api/v1/health", async (_, res) => {
   try {
-    const pool = getPool();
+    const pool = getPool("real");
     const [[ping]] = await pool.query("SELECT 1 AS ok");
-    res.json({ ok: ping.ok === 1 });
+    res.json({ ok: ping.ok === 1, source: "real" });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ ok: false, error: String(err) });
+    res.status(500).json({ ok: false, error: String(err), source: "real" });
   }
 });
 
-// Mount routers
+/**
+ * Health check for the mock database (Epic 2).
+ */
+app.get("/api/v1/health/mock", async (_, res) => {
+  try {
+    const pool = getPool("mock");
+    const [[ping]] = await pool.query("SELECT 1 AS ok");
+    res.json({ ok: ping.ok === 1, source: "mock" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ ok: false, error: String(err), source: "mock" });
+  }
+});
+
+/**
+ * Epic 1 routes
+ */
 app.use("/api/v1/species", speciesRouter); // e.g. /api/v1/species/:code
 app.use("/api/v1", zoneRouter);            // e.g. /api/v1/zone/:zoneCode/rules
-app.use("/api/v1/weather", weatherRouter); // e.g. /api/v1/weather/onecall
 
-// Global error handler
+/**
+ * Epic 2 routes
+ */
+app.use("/api/v1/protected", protectedRouter); // e.g. /api/v1/protected/species
+
+
+app.use("/api/v1/weather", weatherRouter);
+
+
+app.use("/api", (req, res) => {
+  res.status(404).json({
+    error: { code: "not_found", message: `No route for ${req.method} ${req.originalUrl}` },
+  });
+});
+
+/**
+ * Global error handler.
+ */
 app.use((err, req, res, next) => {
   console.error("Unhandled error:", err);
-  res.status(500).json({
+  const status = err.status || 500;
+  res.status(status).json({
     error: {
-      code: "internal_error",
-      message: process.env.NODE_ENV === "production" ? "Server error" : String(err?.message || err),
+      code: err.code || "internal_error",
+      message:
+        process.env.NODE_ENV === "production"
+          ? "Server error"
+          : String(err?.message || err),
       stack: process.env.NODE_ENV === "production" ? undefined : err?.stack,
     },
   });
@@ -73,7 +109,7 @@ app.use((err, req, res, next) => {
 
 export default app;
 
-// Start server unless running in test mode
+
 if (process.env.NODE_ENV !== "test") {
   const port = process.env.PORT || 8080;
   app.listen(port, () => console.log(`API on http://localhost:${port}`));

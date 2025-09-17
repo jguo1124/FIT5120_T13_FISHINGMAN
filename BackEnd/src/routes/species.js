@@ -7,7 +7,11 @@ const router = Router();
 
 /**
  * GET /api/v1/species
- * 返回所有物种。真实库用 FISH 表，没有 common_name，这里用 species 占位到 common_name。
+ *
+ * Returns all species from the real database.
+ * Data source: the FISH table.
+ * - Note: The table does not have a `common_name` column,
+ *   so the `species` value is duplicated into `common_name` as a placeholder.
  */
 router.get("/", async (_req, res, next) => {
   try {
@@ -23,7 +27,10 @@ router.get("/", async (_req, res, next) => {
 
 /**
  * GET /api/v1/species/:code
- * 物种详情（走 repo 内已改好的 getSpeciesByCode → 查 FISH）
+ *
+ * Returns details for a single species.
+ * - Delegates to repo function `getSpeciesByCode`, which queries the FISH table.
+ * - If no species is found for the provided code, a 404 is returned.
  */
 router.get("/:code", async (req, res, next) => {
   try {

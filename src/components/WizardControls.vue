@@ -7,7 +7,7 @@ const props = defineProps({
   species: { type: String, default: "" },
   speciesOptions: { type: Array, default: () => [] },
   speciesLoading: { type: Boolean, default: false },
-  step: { type: Number, default: 1 },    // 1=Zone, 2=Date, 3=Species(可选)
+  step: { type: Number, default: 1 },    // 1=Zone, 2=Date, 3=Species
   loading: { type: Boolean, default: false },
 });
 const emit = defineEmits(["update:zone", "update:onDate", "update:species"]);
@@ -26,7 +26,7 @@ const emit = defineEmits(["update:zone", "update:onDate", "update:species"]);
       >
         <option value="" disabled>Select a zone</option>
         <option v-for="z in zones" :key="z.code" :value="z.code">
-          {{ z.code }} — {{ z.area }}
+          {{ z.code }} - {{ z.area }}
         </option>
       </select>
     </div>
@@ -57,7 +57,7 @@ const emit = defineEmits(["update:zone", "update:onDate", "update:species"]);
           {{ s.common_name || s.code }} ({{ s.code }})
         </option>
       </select>
-      <small v-if="speciesLoading">Loading species…</small>
+      <small v-if="speciesLoading">Loading species...</small>
       <small v-else-if="!speciesLoading && !speciesOptions.length">No species available</small>
     </div>
   </div>
