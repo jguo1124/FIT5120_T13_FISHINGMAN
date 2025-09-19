@@ -12,13 +12,6 @@
 
     <!-- Call To Action -->
     <CallToAction />
-
-    <!-- Footer -->
-    <footer class="footer">
-      <p class="copyright">
-        © GOFish Sustainbly. All rights reserved
-      </p>
-    </footer>
   </div>
 </template>
 
