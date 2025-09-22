@@ -1,4 +1,4 @@
-# GOFish Sustainably - Development Repository
+# GOFish Sustainably - source code Repository
 
 ## Overview
 This repository contains the **full source code** of the **GOFish Sustainably Dashboard** (FIT5120 T13 project).  
