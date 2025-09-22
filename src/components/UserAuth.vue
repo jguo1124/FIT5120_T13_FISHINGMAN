@@ -1,9 +1,7 @@
 <template>
-  <div class="user-auth" @keydown.esc="closeAll">
+  <div class="user-auth" @keydown.esc="close">
     <button class="btn" @click="openLogin = true">Login</button>
-    <button class="btn" @click="openRegister = true">Register</button>
 
-    <!-- Login Modal -->
     <div
       v-if="openLogin"
       class="modal"
@@ -13,42 +11,17 @@
       @click.self="openLogin = false"
     >
       <div class="modal-content">
-        <h3 id="login-title">Login</h3>
+        <h3 id="login-title">Administrator Login</h3>
         <form @submit.prevent="handleLogin" class="form">
-          <input v-model="loginEmail" type="email" placeholder="Email" required class="input" />
-          <input v-model="loginPassword" type="password" placeholder="Password" required class="input" />
+          <input v-model="loginUsername" type="text" placeholder="Username" required class="input" autocomplete="username" />
+          <input v-model="loginPassword" type="password" placeholder="Password" required class="input" autocomplete="current-password" />
+          <p v-if="errorMessage" class="error" role="alert">{{ errorMessage }}</p>
           <div class="form__actions">
-            <button type="button" class="btn" @click="openLogin = false">Close</button>
-            <button type="submit" class="btn">Submit</button>
-          </div>
-        </form>
-      </div>
-    </div>
-
-    <!-- Register Modal -->
-    <div
-      v-if="openRegister"
-      class="modal"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="register-title"
-      @click.self="openRegister = false"
-    >
-      <div class="modal-content">
-        <h3 id="register-title">Register</h3>
-        <form @submit.prevent="handleRegister" class="form">
-          <input
-            v-model="registerName"
-            type="text"
-            placeholder="Full Name"
-            required
-            class="input"
-          />
-          <input v-model="registerEmail" type="email" placeholder="Email" required class="input" />
-          <input v-model="registerPassword" type="password" placeholder="Password" required class="input" />
-          <div class="form__actions">
-            <button type="button" class="btn" @click="openRegister = false">Close</button>
-            <button type="submit" class="btn">Submit</button>
+            <button type="button" class="btn" @click="openLogin = false" :disabled="isSubmitting">Close</button>
+            <button type="submit" class="btn primary" :disabled="isSubmitting">
+              <span v-if="isSubmitting">Logging in...</span>
+              <span v-else>Submit</span>
+            </button>
           </div>
         </form>
       </div>
@@ -64,140 +37,178 @@ import { useUserStore } from '@/stores/user'
 const userStore = useUserStore()
 const router = useRouter()
 
+const API_BASE = import.meta?.env?.VITE_API_BASE || ''
+
 const openLogin = ref(false)
-const openRegister = ref(false)
-
-const loginEmail = ref('')
+const loginUsername = ref('')
 const loginPassword = ref('')
-const registerName = ref('')
-const registerEmail = ref('')
-const registerPassword = ref('')
+const isSubmitting = ref(false)
+const errorMessage = ref('')
 
+async function handleLogin() {
+  if (isSubmitting.value) return
+  errorMessage.value = ''
+  isSubmitting.value = true
+  try {
+    const response = await fetch(`${API_BASE}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: loginUsername.value.trim(), password: loginPassword.value }),
+    })
 
-const handleLogin = () => {
-  const savedName = localStorage.getItem('userName')
-  const savedEmail = localStorage.getItem('userEmail')
-  const savedPassword = localStorage.getItem('userPassword')
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      const message = payload?.error?.message || 'Login failed. Please check your credentials.'
+      throw new Error(message)
+    }
 
-  if (loginEmail.value === savedEmail && loginPassword.value === savedPassword) {
-    userStore.login(savedName || '', savedEmail || '')
+    if (!payload?.token || typeof payload.token !== 'string' || !payload.token.trim()) {
+      throw new Error('Invalid login response from server.');
+    }
+
+    const user = payload?.user || {}
+    userStore.applyProfile({
+      token: payload?.token,
+      name: user.displayName || user.username,
+      email: user.email,
+      role: user.role,
+    })
+
+    loginPassword.value = ''
     openLogin.value = false
     router.push('/')
-  } else {
-    alert('Login failed! Wrong email or password.')
+  } catch (err: unknown) {
+    if (err instanceof Error) {
+      errorMessage.value = err.message
+    } else {
+      errorMessage.value = 'Login failed.'
+    }
+  } finally {
+    isSubmitting.value = false
   }
 }
-const handleRegister = () => {
-  localStorage.setItem('userName', registerName.value)
-  localStorage.setItem('userEmail', registerEmail.value)
-  localStorage.setItem('userPassword', registerPassword.value)
-  alert('Register success! You can login now.')
-  openRegister.value = false
-}
 
-function closeAll() {
+function close() {
   openLogin.value = false
-  openRegister.value = false
 }
 
-/** Prevent background scroll when any modal is open */
-watch([openLogin, openRegister], ([loginOpen, regOpen]) => {
-  const anyOpen = loginOpen || regOpen
-  document.documentElement.style.overflow = anyOpen ? 'hidden' : ''
-  document.body.style.overflow = anyOpen ? 'hidden' : ''
+watch(openLogin, (isOpen) => {
+  const root = document.documentElement
+  const body = document.body
+  if (isOpen) {
+    root.style.overflow = 'hidden'
+    body.style.overflow = 'hidden'
+  } else {
+    root.style.overflow = ''
+    body.style.overflow = ''
+  }
 })
 </script>
 
-  <style scoped>
-  .user-auth {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-  }
+<style scoped>
+.user-auth {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
 
-  /* Overlay: full-screen mask that hides page content */
-  .modal {
-    position: fixed;
-    inset: 0;
-    z-index: 2000;
-    display: grid;
-    place-items: center;                   /* center the card */
-    padding: 20px;
-    background: rgba(0,0,0,.6);            /* darker mask to hide content */
-    -webkit-backdrop-filter: blur(2px);
-    backdrop-filter: blur(2px);
-  }
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0,0,0,.6);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+}
 
-  /* Centered card */
-  .modal-content {
-    width: min(520px, 92vw);
-    background: #ffffff;
-    border-radius: 16px;
-    padding: 22px;
-    box-shadow:
-      0 30px 60px rgba(0,0,0,.22),
-      0 10px 20px rgba(0,0,0,.12);
-    animation: pop .18s ease-out;
-  }
-  @keyframes pop {
-    from { transform: translateY(6px) scale(.98); opacity: 0; }
-    to   { transform: translateY(0)   scale(1);    opacity: 1; }
-  }
+.modal-content {
+  width: min(520px, 92vw);
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 22px;
+  box-shadow:
+    0 30px 60px rgba(0,0,0,.22),
+    0 10px 20px rgba(0,0,0,.12);
+  animation: pop .18s ease-out;
+}
 
-  .btn-close:hover {
-    text-decoration: underline;
-    box-shadow: 0 3px 6px rgba(0,0,0,.15);
-  }
+@keyframes pop {
+  from { transform: translateY(6px) scale(.98); opacity: 0; }
+  to   { transform: translateY(0)   scale(1);    opacity: 1; }
+}
 
-  /* Inputs & form layout */
-  .form {
-    display: grid;
-    gap: 10px;
-    margin-top: 8px;
-  }
-  .input {
-    width: 80%;             
-    max-width: 320px;     
-    margin: 0 auto;        
-    display: block;       
-    padding: 10px 12px;
-    border-radius: 10px;
-    border: 1px solid #e5e7eb;
-    background: #fff;
-    color: #000;
-  }
-  .input::placeholder { color: #9ca3af; }
-  .input:focus {
-    outline: none;
-    border-color: #333;
-    box-shadow: 0 0 0 4px rgba(0,0,0,.12);
-  }
+.form {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
 
-  .form__actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    margin-top: 12px;
-  }
+.input {
+  width: 80%;
+  max-width: 320px;
+  margin: 0 auto;
+  display: block;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  color: #000;
+}
 
-  .btn,
-  .btn-close {
-    padding: 6px 14px;
-    border: none;
-    border-radius: 6px;
-    font-weight: 600;
-    cursor: pointer;
-    background: #ffffff;
-    color: #000000;
-    box-shadow: 0 2px 4px rgba(0,0,0,.1);
-    transition: box-shadow 0.2s ease, transform 0.2s ease;
-  }
+.input::placeholder { color: #9ca3af; }
+.input:focus {
+  outline: none;
+  border-color: #333;
+  box-shadow: 0 0 0 4px rgba(0,0,0,.12);
+}
 
-  .btn:hover,
-  .btn-close:hover {
-    color: rgba(13,155,181,1);
-    text-decoration: underline;
-    box-shadow: 0 4px 8px rgba(13,155,181,0.25); 
-    transform: translateY(-1px);
-  }
-  </style>
+.error {
+  color: #b91c1c;
+  font-size: 13px;
+  margin: 4px auto 0;
+}
+
+.form__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.btn,
+.btn.primary {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  background: #ffffff;
+  color: #000000;
+  box-shadow: 0 2px 4px rgba(0,0,0,.1);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.btn:hover,
+.btn.primary:hover {
+  color: rgba(13,155,181,1);
+  text-decoration: underline;
+  box-shadow: 0 4px 8px rgba(13,155,181,0.25);
+  transform: translateY(-1px);
+}
+
+.btn.primary {
+  background: rgba(13,155,181,1);
+  color: #fff;
+}
+
+.btn.primary:disabled,
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  text-decoration: none;
+  transform: none;
+}
+</style>

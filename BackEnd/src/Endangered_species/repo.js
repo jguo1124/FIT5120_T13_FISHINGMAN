@@ -1,32 +1,25 @@
-// BackEnd/src/Endangered_species/repo.js
 import { getPool } from "../services/repo/mysqlPool.js";
 
-/**
- * Epic2 Repository — reads data from the endangered_cards table
- * Table schema:
- *   common_name, scientific_name, conservation_status, distribution, image, sources
- *
- * Convention: since the table does not have an auto-increment id,
- * we use scientific_name as a stable primary key (id).
- * If duplicate scientific_name values exist, consider using
- * CONCAT(scientific_name, '-', common_name) as a unique identifier.
- */
+const MAX_PAGE_SIZE = Number.parseInt(process.env.PROTECTED_MAX_PAGE_SIZE || "50", 10);
 
 function pool() {
-  return getPool("mock"); // Connect to your fishingman_db (DATABASE_URL_MOCK in .env)
+  return getPool("mock");
 }
 
 export async function listEndangered({
   q = "",
   page = 1,
   pageSize = 12,
-  status = "",             // filter by conservation_status
+  status = "",
   sort = "common_name",
   order = "asc",
 }) {
   const p = pool();
 
-  // Only allow sorting by whitelisted columns
+  const safePage = Number.isFinite(page) ? Math.max(Math.trunc(page), 1) : 1;
+  const requestedSize = Number.isFinite(pageSize) ? Math.max(Math.trunc(pageSize), 1) : 12;
+  const safePageSize = Math.min(requestedSize, MAX_PAGE_SIZE);
+
   const sortWhitelist = new Set([
     "common_name",
     "scientific_name",
@@ -35,7 +28,6 @@ export async function listEndangered({
   sort = sortWhitelist.has(sort) ? sort : "common_name";
   order = order.toLowerCase() === "desc" ? "DESC" : "ASC";
 
-  // Build WHERE clause dynamically
   const where = [];
   const params = [];
   if (q) {
@@ -48,18 +40,16 @@ export async function listEndangered({
   }
   const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
-  // Query total count
   const [[{ total }]] = await p.query(
     `SELECT COUNT(*) AS total FROM endangered_cards ${whereSql}`,
     params
   );
 
-  // Query paginated rows
-  const offset = (page - 1) * pageSize;
+  const offset = (safePage - 1) * safePageSize;
   const [rows] = await p.query(
     `
     SELECT
-      scientific_name AS id,            -- used by frontend as species_code
+      scientific_name AS id,
       common_name,
       scientific_name,
       conservation_status,
@@ -71,14 +61,14 @@ export async function listEndangered({
     ORDER BY ${sort} ${order}
     LIMIT ? OFFSET ?
     `,
-    [...params, pageSize, offset]
+    [...params, safePageSize, offset]
   );
 
   return {
-    page,
-    pageSize,
+    page: safePage,
+    pageSize: safePageSize,
     total,
-    totalPages: Math.ceil(total / pageSize),
+    totalPages: safePageSize > 0 ? Math.ceil(total / safePageSize) : 0,
     items: rows,
   };
 }

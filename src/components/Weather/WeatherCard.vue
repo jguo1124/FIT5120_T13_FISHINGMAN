@@ -64,7 +64,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, watch } from "vue";
+import { useUserStore } from "@/stores/user";
 
 /**
  * Component props with sensible defaults.
@@ -88,6 +89,9 @@ const props = withDefaults(defineProps<{
   exclude: "minutely,alerts",
   useGeolocation: true,
 });
+
+const userStore = useUserStore();
+const API_BASE = (import.meta.env?.VITE_API_BASE ?? "/api/v1").replace(/\/+$/, "");
 
 /** View-state machine */
 type WeatherState = "idle" | "loading" | "error" | "success";
@@ -137,34 +141,31 @@ async function fetchOneCall(lat: number, lon: number) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 12000);
   try {
-    const url = `/api/v1/weather/onecall?lat=${lat}&lon=${lon}&units=${props.units}&lang=${props.lang}&exclude=${props.exclude}`;
+    const url = `${API_BASE}/weather/onecall?lat=${lat}&lon=${lon}&units=${props.units}&lang=${props.lang}&exclude=${props.exclude}`;
+    const headers = new Headers({ 'Cache-Control': 'no-cache', Accept: 'application/json' });
+    if (userStore.authToken) {
+      headers.set('Authorization', `Bearer ${userStore.authToken}`);
+    }
     const res = await fetch(url, {
       signal: ctrl.signal,
-      cache: "no-store",                        // dev: avoid 304/empty body
-      headers: { "Cache-Control": "no-cache" }, // dev: avoid stale caches
+      cache: 'no-store',
+      headers,
     });
-    const text = await res.text();
+    const textBody = await res.text();
     if (!res.ok) {
       try {
-        const j = JSON.parse(text);
+        const j = JSON.parse(textBody);
         throw new Error(j?.error?.message || `HTTP ${res.status}`);
       } catch {
-        throw new Error(text.slice(0, 160));
+        throw new Error(textBody.slice(0, 160));
       }
     }
-    return JSON.parse(text);
+    return JSON.parse(textBody);
   } finally {
     clearTimeout(timer);
   }
 }
 
-/**
- * Risk logic (English):
- * - Not recommended: wind > 30 km/h (rough waters, safety risk)
- * - Caution: rain probability ≥ 60% (wet conditions; prepare rain gear and check hour-by-hour)
- * - Safe: otherwise
- * Returns both the level and a human-readable reason for UI.
- */
 function computeLevelKmH(wkmh: number | null, p: number) {
   if (wkmh != null && wkmh > 30) {
     return {
@@ -187,11 +188,25 @@ function computeLevelKmH(wkmh: number | null, p: number) {
   };
 }
 
+function sanitizeCoordinate(value: number | undefined, min: number, max: number, label: string) {
+  const num = typeof value === "number" ? value : Number.parseFloat(String(value ?? ""));
+  if (!Number.isFinite(num) || num < min || num > max) {
+    throw new Error(`Invalid ${label}`);
+  }
+  return Number(num.toFixed(4));
+}
+
 /**
  * Load and map weather data.
  * Coordinate source priority: props → geolocation → fallback label.
  */
 async function loadWeather(lat?: number, lon?: number) {
+  if (!userStore.authToken) {
+    state.value = "error";
+    errorMessage.value = "Login required to load weather data.";
+    return;
+  }
+
   state.value = "loading";
   errorMessage.value = "";
 
@@ -199,7 +214,6 @@ async function loadWeather(lat?: number, lon?: number) {
     let usedLat = lat ?? props.initialLat;
     let usedLon = lon ?? props.initialLon;
 
-    // If initial coords are provided, use them; otherwise try geolocation
     if (usedLat != null && usedLon != null) {
       locationLabel.value = props.fallbackLabel;
     } else if (props.useGeolocation && "geolocation" in navigator) {
@@ -222,22 +236,19 @@ async function loadWeather(lat?: number, lon?: number) {
       locationLabel.value = props.fallbackLabel;
     }
 
-    if (usedLat == null || usedLon == null) {
-      throw new Error("No coordinates available");
-    }
+    const safeLat = sanitizeCoordinate(usedLat, -90, 90, "latitude");
+    const safeLon = sanitizeCoordinate(usedLon, -180, 180, "longitude");
 
-    const oc = await fetchOneCall(usedLat, usedLon);
+    const oc = await fetchOneCall(safeLat, safeLon);
 
-    // Map fields from One Call 3.0 payload
     const cur = oc?.current || {};
     const d0 = Array.isArray(oc?.daily) ? oc.daily[0] : null;
 
     currentTemp.value = typeof cur.temp === "number" ? cur.temp : null;
     currentDesc.value =
       (Array.isArray(cur.weather) && cur.weather[0]?.description) ||
-      (Array.isArray(cur.weather) && cur.weather[0]?.main) || "—";
+      (Array.isArray(cur.weather) && cur.weather[0]?.main) || "??";
 
-    // OpenWeather "metric" wind speed is m/s → convert to km/h
     const windMs = typeof cur.wind_speed === "number" ? cur.wind_speed : null;
     wind.value = windMs == null ? null : windMs * 3.6;
 
@@ -249,7 +260,6 @@ async function loadWeather(lat?: number, lon?: number) {
 
     tz.value = oc?.timezone || "Australia/Melbourne";
 
-    // Compute risk + explanation
     const lvl = computeLevelKmH(wind.value, pop.value);
     riskLevel.value = lvl.level;
     riskText.value = lvl.text;
@@ -258,7 +268,13 @@ async function loadWeather(lat?: number, lon?: number) {
     state.value = "success";
   } catch (e: any) {
     state.value = "error";
-    errorMessage.value = e?.message || "Failed to load weather";
+    const message = String(e?.message || e || "");
+    if (message && (message.toLowerCase().includes("unauthorized") || message.includes("401"))) {
+      errorMessage.value = "Session expired. Please log in again.";
+      userStore.logout();
+    } else {
+      errorMessage.value = message || "Failed to load weather";
+    }
   }
 }
 
@@ -267,15 +283,27 @@ function reload() {
   loadWeather(props.initialLat, props.initialLon);
 }
 
-/** Initial fetch */
-onMounted(() => {
-  loadWeather(props.initialLat, props.initialLon);
-});
+watch(
+  () => userStore.authToken,
+  (token) => {
+    if (token) {
+      loadWeather(props.initialLat, props.initialLon);
+    } else {
+      state.value = "error";
+      errorMessage.value = "Login required to load weather data.";
+    }
+  },
+  { immediate: true }
+);
 
-/** Auto-refresh when parent updates initial coords */
-watch(() => [props.initialLat, props.initialLon], ([la, lo]) => {
-  if (la != null && lo != null) loadWeather(la, lo);
-});
+watch(
+  () => [props.initialLat, props.initialLon],
+  ([la, lo]) => {
+    if (userStore.authToken && la != null && lo != null) {
+      loadWeather(la, lo);
+    }
+  }
+);
 </script>
 
 <style scoped>

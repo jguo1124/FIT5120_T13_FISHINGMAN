@@ -1,50 +1,112 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
+const STORAGE_KEY = 'userSession'
+
+function safeSessionStorage() {
+  if (typeof window === 'undefined') return null
+  try {
+    return window.sessionStorage
+  } catch (err) {
+    console.warn('[auth] Unable to access sessionStorage:', err)
+    return null
+  }
+}
+
 export const useUserStore = defineStore('user', () => {
   const isLoggedIn = ref(false)
   const userName = ref('')
   const userEmail = ref('')
   const avatarUrl = ref('')
+  const authToken = ref('')
+  const userRole = ref('')
 
-  function login(name: string, email: string) {
+  function persist() {
+    const storage = safeSessionStorage()
+    if (!storage) return
+    const payload = {
+      token: authToken.value,
+      name: userName.value,
+      email: userEmail.value,
+      role: userRole.value,
+    }
+    storage.setItem(STORAGE_KEY, JSON.stringify(payload))
+  }
+
+  function loadFromStorage() {
+    const storage = safeSessionStorage()
+    if (!storage) return null
+    const raw = storage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    try {
+      return JSON.parse(raw)
+    } catch (err) {
+      console.warn('[auth] Failed to parse session payload:', err)
+      storage.removeItem(STORAGE_KEY)
+      return null
+    }
+  }
+
+  function applyProfile({
+    token,
+    name,
+    email,
+    role,
+  }: { token: string; name?: string; email?: string; role?: string }) {
+    if (typeof token !== 'string' || !token.trim()) {
+      throw new Error('Missing authentication token');
+    }
+    authToken.value = token
+    userName.value = name || 'Administrator'
+    userEmail.value = email || ''
+    userRole.value = role || ''
+    avatarUrl.value = `https://ui-avatars.com/api/?name=${encodeURIComponent(userName.value || 'A')}`
     isLoggedIn.value = true
-    userName.value = name
-    userEmail.value = email
-    avatarUrl.value = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}`
-    // persist
-    localStorage.setItem('userName', name)
-    localStorage.setItem('userEmail', email)
+    persist()
   }
 
   function logout() {
+    authToken.value = ''
     isLoggedIn.value = false
     userName.value = ''
     userEmail.value = ''
+    userRole.value = ''
     avatarUrl.value = ''
-    localStorage.removeItem('userName')
-    localStorage.removeItem('userEmail')
-    localStorage.removeItem('userPassword')
+    const storage = safeSessionStorage()
+    storage?.removeItem(STORAGE_KEY)
   }
 
   function updateName(newName: string) {
     userName.value = newName
-    avatarUrl.value = `https://ui-avatars.com/api/?name=${encodeURIComponent(newName)}`
-    localStorage.setItem('userName', newName)
+    avatarUrl.value = `https://ui-avatars.com/api/?name=${encodeURIComponent(newName || 'A')}`
+    persist()
   }
 
-  // hydrate from localStorage (for simulated auth)
   function hydrate() {
-    const n = localStorage.getItem('userName')
-    const e = localStorage.getItem('userEmail')
-    if (n && e) {
+    const saved = loadFromStorage()
+    if (!saved) return
+    if (saved.token) {
+      authToken.value = saved.token
+      userName.value = saved.name || 'Administrator'
+      userEmail.value = saved.email || ''
+      userRole.value = saved.role || ''
+      avatarUrl.value = `https://ui-avatars.com/api/?name=${encodeURIComponent(userName.value || 'A')}`
       isLoggedIn.value = true
-      userName.value = n
-      userEmail.value = e
-      avatarUrl.value = `https://ui-avatars.com/api/?name=${encodeURIComponent(n)}`
     }
   }
+
   hydrate()
 
-  return { isLoggedIn, userName, userEmail, avatarUrl, login, logout, updateName, hydrate }
+  return {
+    isLoggedIn,
+    userName,
+    userEmail,
+    avatarUrl,
+    authToken,
+    userRole,
+    applyProfile,
+    logout,
+    updateName,
+    hydrate,
+  }
 })

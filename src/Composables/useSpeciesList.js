@@ -1,8 +1,9 @@
-// useSpeciesList.js
 import { ref, computed } from "vue";
+import { useUserStore } from "@/stores/user";
 
 export function useSpeciesList() {
-  
+  const userStore = useUserStore();
+
   const zone = ref("VIC-BAY");
   const q = ref("");
   const radiusKm = ref(20);
@@ -12,11 +13,9 @@ export function useSpeciesList() {
   const items = ref([]);
   const loading = ref(false);
 
-
   const useMock = true;
-  const API_BASE = import.meta?.env?.VITE_API_BASE || "";
+  const API_BASE = (import.meta?.env?.VITE_API_BASE ?? "/api/v1").replace(/\/+$/, "");
   const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)));
-
 
   async function fetchList() {
     loading.value = true;
@@ -24,10 +23,8 @@ export function useSpeciesList() {
       if (useMock) {
         await new Promise(r => setTimeout(r, 150));
 
-       
         const localImage = new URL("@/assets/1.jpg", import.meta.url).href;
 
-       
         const base = {
           species_code: "GREENGROPER",
           common_name: "Green Groper",
@@ -60,10 +57,26 @@ export function useSpeciesList() {
         const start = (page.value - 1) * pageSize.value;
         items.value = filtered.slice(start, start + pageSize.value);
       } else {
-        const url = `${API_BASE}/api/v1/protected?zone=${encodeURIComponent(
+        if (!userStore.authToken) {
+          items.value = [];
+          total.value = 0;
+          return;
+        }
+        const url = `${API_BASE}/protected/species?zone=${encodeURIComponent(
           zone.value
         )}&q=${encodeURIComponent(q.value)}&radiusKm=${radiusKm.value}&page=${page.value}&pageSize=${pageSize.value}`;
-        const r = await fetch(url);
+
+        const headers = new Headers({ Accept: "application/json" });
+        headers.set("Authorization", `Bearer ${userStore.authToken}`);
+
+        const r = await fetch(url, { headers, cache: "no-store" });
+        if (r.status === 401) {
+          userStore.logout();
+          items.value = [];
+          total.value = 0;
+          return;
+        }
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const data = await r.json();
         items.value = data.items || [];
         total.value = data.total ?? items.value.length;
@@ -95,9 +108,7 @@ export function useSpeciesList() {
   }
 
   return {
-    // state
     zone, q, radiusKm, page, pageSize, total, items, loading, totalPages,
-    // actions
     fetchList, applyFilters, prevPage, nextPage,
   };
 }
