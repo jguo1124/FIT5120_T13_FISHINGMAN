@@ -23,7 +23,7 @@ export async function getCombinedSpeciesByZone(zoneCode){
   if (!zone) return null;
   const area = zone.area;
 
-  // 1) SPOT（优先）
+
   const [spotRows] = await pool.query(
     `SELECT species, daily_limit, min_size_cm, max_size_cm, 'spot' AS source
      FROM QUOTAS_SPOT
@@ -31,7 +31,7 @@ export async function getCombinedSpeciesByZone(zoneCode){
      ORDER BY species`, [zoneCode]
   );
 
-  // helper：按不同 where 抓 GENERAL，并排除已有 SPOT 的物种
+  
   async function fetchGeneral(whereSql, params, tag){
     const [rows] = await pool.query(
       `
@@ -63,7 +63,7 @@ export async function getCombinedSpeciesByZone(zoneCode){
     generalRows = await fetchGeneral("qg.area_desc = 'All Victorian Waters'", [], "statewide");
   }
 
-  // 合并：general 先入，再用 spot 覆盖
+ 
   const merged = new Map();
   for (const r of generalRows) merged.set(r.species, r);
   for (const r of spotRows) merged.set(r.species, r);
@@ -76,7 +76,7 @@ export async function getCombinedSpeciesByZone(zoneCode){
     };
   }
 
-  // FISH 一次性取状态/图片/来源
+  
   const placeholders = speciesList.map(()=>"?").join(",");
   const [fishRows] = await pool.query(
     `SELECT species, endangered_status, extinction_risk, image, sources
@@ -85,7 +85,7 @@ export async function getCombinedSpeciesByZone(zoneCode){
   );
   const fMap = new Map(fishRows.map(r => [r.species, r]));
 
-  // 分组
+
   const groups = { endangered:[], invasive:[], general:[] };
   for (const [sp, rule] of merged.entries()){
     const f = fMap.get(sp) || {};
@@ -106,7 +106,6 @@ export async function getCombinedSpeciesByZone(zoneCode){
     });
   }
 
-  // 各组按物种名排序
   for (const k of Object.keys(groups)) {
     groups[k].sort((a,b)=>a.species.localeCompare(b.species));
   }
