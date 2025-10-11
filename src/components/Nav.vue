@@ -5,6 +5,7 @@
     <RouterLink to="/endangered" class="link"active-class="active">Endangered </RouterLink>
     <RouterLink to="/about" class="link" active-class="active">About</RouterLink>
     <RouterLink to="/knowledgeHub" class="link" active-class="active">knowledgehub</RouterLink>
+    <RouterLink to="/combined" class="link" active-class="active">combined</RouterLink>
   </nav>
 </template>
 

@@ -16,6 +16,11 @@ const routes = [
   { path: '/favorites', name: 'favorites', component: Favorites },  
   { path: '/profile', name: 'profile', component: Profile },  
   {path: '/knowledgehub', name:'knowledgehub', component: knowledgeHub},
+  {
+  path: '/combined',
+  name: 'SpeciesCombined',
+  component: () => import('@/views/SpeciesCombinedView.vue')
+},
 ]
 
 export default createRouter({
