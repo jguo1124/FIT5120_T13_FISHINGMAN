@@ -10,7 +10,7 @@
 
     <div class="kh-meta">
       <span v-if="displayDate">🗓 {{ displayDate }}</span>
-      <span v-if="item.source">· 来源：{{ item.source }}</span>
+      <span v-if="item.source">· source：{{ item.source }}</span>
       <span class="kh-link">
         <a :href="item.url" target="_blank" rel="noopener noreferrer">Read More →</a>
       </span>
