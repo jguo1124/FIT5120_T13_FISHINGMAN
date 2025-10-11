@@ -1,6 +1,6 @@
 // src/lib/api.js
 
-// Base URL comes from .env (e.g. VITE_API_BASE=http://localhost:8080/api/v1).
+// Base URL comes from .env (e.g. VITE_API_BASE=http://localhost:8080 or /api/v1).
 // When not provided, default to relative "/api/v1" so Cloudflare Pages + redirects work.
 const BASE = import.meta.env.VITE_API_BASE ?? "/api/v1";
 
@@ -48,17 +48,17 @@ function buildUrl(path, params) {
   return url.toString();
 }
 
-/** GET /species to list of species [{ code, common_name, ... }] */
+/** GET /species → list of species [{ code, common_name, ... }] */
 export async function fetchSpeciesList() {
   return getJson(buildUrl("/species"));
 }
 
-/** GET /species/:code to details for a species */
+/** GET /species/:code → details for a species */
 export async function fetchSpeciesDetail(code) {
   return getJson(buildUrl(`/species/${encodeURIComponent(code)}`));
 }
 
-/** GET /zones to list all fishing spots [{ code, area }] */
+/** GET /zones → list all fishing spots [{ code, area }] */
 export async function fetchZones() {
   return getJson(buildUrl("/zones"));
 }
@@ -78,7 +78,34 @@ export async function fetchZoneRules({ zoneCode, onDate, species } = {}) {
   return getJson(url);
 }
 
-/** Clear ETag cache (optional utility). */
+/**
+ * 🆕 GET /knowledge → list of guides/tutorials/news
+ * Example usage:
+ *   fetchKnowledge({ category: 'news', page: 1, page_size: 8, sort: 'date_desc' })
+ * 
+ * Backend returns:
+ * {
+ *   items: [
+ *     { id, category, title, summary, url, published_at, source, created_at },
+ *     ...
+ *   ],
+ *   total: 12
+ * }
+ */
+export async function fetchKnowledge({
+  category = "guide",      // 'guide' | 'tutorial' | 'news'
+  page = 1,
+  page_size = 10,
+  sort = "date_desc",      // 'date_desc' | 'date_asc'
+} = {}) {
+  const validCats = ["guide", "tutorial", "news"];
+  if (!validCats.includes(category)) throw new Error("Invalid category");
+
+  const url = buildUrl("/knowledge", { category, page, page_size, sort });
+  return getJson(url);
+}
+
+/** Optional: clear the ETag cache manually. */
 export function clearApiCache() {
   etagCache.clear();
 }

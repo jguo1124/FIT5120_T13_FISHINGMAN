@@ -84,7 +84,7 @@ app.use("/api/v1/protected", protectedRouter); // e.g. /api/v1/protected/species
 
 app.use("/api/v1/weather", weatherRouter);
 
-app.use('/knowledge', knowledgeRouter);
+app.use('/api/v1/knowledge', knowledgeRouter);
 
 app.use("/api", (req, res) => {
   res.status(404).json({

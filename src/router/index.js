@@ -5,6 +5,7 @@ import About from '../views/About.vue'
 import EndangeredSpeciesTable from '@/Views/EndangeredSpeciesTable.vue'
 import Profile from '../views/Profile.vue'      
 import Favorites from '../views/Favorites.vue'
+import knowledgeHub from '../views/knowledgeHub.vue'
 
 const routes = [
   { path: '/', component: Home },
@@ -14,6 +15,7 @@ const routes = [
   { path: '/Home', redirect: '/' }, 
   { path: '/favorites', name: 'favorites', component: Favorites },  
   { path: '/profile', name: 'profile', component: Profile },  
+  {path: '/knowledgehub', name:'knowledgehub', component: knowledgeHub},
 ]
 
 export default createRouter({
