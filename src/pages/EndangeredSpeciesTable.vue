@@ -29,7 +29,7 @@
 
       <!-- Loading / end sentinel -->
       <div ref="sentinel" class="sentinel">
-        <span v-if="loading">Loading…</span>
+        <span v-if="loading">Loading...</span>
         <span v-else-if="reachedEnd">No more results</span>
       </div>
 

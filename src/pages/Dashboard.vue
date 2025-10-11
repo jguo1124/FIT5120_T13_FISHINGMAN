@@ -60,13 +60,11 @@ async function loadZones() {
   try {
     const list = await fetchZones();
     zones.value = list;
-    if (!zone.value && list?.length) zone.value = list[0].code;
   } catch (e) {
     console.warn("Failed to load zones, use fallback.", e);
     zones.value = [
       { code: "Lake Bullen Merri", area: "South-West / Shipwreck Coast" },
     ];
-    zone.value = zones.value[0].code;
   } finally {
     step.value = zone.value ? 2 : 1;
   }
@@ -137,13 +135,35 @@ function onSpeciesChanged(v) {
   species.value = v; // client-side filter only (no extra request)
 }
 
+function onBack() {
+  if (step.value === 3) {
+    species.value = "";
+    step.value = 2;
+    return;
+  }
+  if (step.value === 2) {
+    onDate.value = "";
+    species.value = "";
+    rawList.value = [];
+    speciesOptions.value = [];
+    step.value = 1;
+    return;
+  }
+}
+
 // Fallback guards to advance steps even if child events are not emitted
 watch(zone, (v) => {
-  step.value = v ? Math.max(step.value, 2) : 1;
-});
-watch(onDate, (v) => {
-  if (zone.value && v) step.value = 3;
-});
+   if (!v) {
+     step.value = 1;
+   } else if (step.value === 1) {
+     step.value = 2;
+   }
+ });
+ watch(onDate, (v) => {
+   if (zone.value && v && step.value === 2) {
+     step.value = 3;
+   }
+ });
 
 const stepPills = computed(() => ([
   { id: 1, label: "Zone", icon: "📍", state: step.value >= 1 ? (step.value > 1 ? "done" : "current") : "todo" },
@@ -204,6 +224,10 @@ onMounted(loadZones);
         @update:zone="onZoneChanged"
         @update:onDate="onDateChanged"
         @update:species="onSpeciesChanged"
+        @update:hideNoRestrictions="onToggleHideNoRestrictions"
+        @next="onNext"
+        @show="onShow"
+        @back="onBack"
       />
     </div>
 

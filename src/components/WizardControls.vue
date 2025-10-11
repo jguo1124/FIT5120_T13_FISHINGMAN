@@ -20,6 +20,40 @@ const emit = defineEmits([
   "back",
   "show",
 ]);
+function onNext() {
+  // Step 1 -> 2：保留已选 zone，清空下游
+  if (!zone.value) return;
+  onDate.value = "";
+  species.value = "";
+  rawList.value = [];
+  speciesOptions.value = [];
+  step.value = 2;
+}
+
+function onShow() {
+  if (!zone.value || !onDate.value) return;
+  step.value = 3;
+  loadAllRegulations();
+}
+
+function onBack() {
+  if (step.value === 3) {
+    species.value = "";
+    step.value = 2;
+    return;
+  }
+  if (step.value === 2) {
+    onDate.value = "";
+    species.value = "";
+    rawList.value = [];
+    speciesOptions.value = [];
+    step.value = 1;
+  }
+}
+
+function onToggleHideNoRestrictions(v) {
+  hideNoRestrictions.value = v;
+}
 </script>
 
 <template>
