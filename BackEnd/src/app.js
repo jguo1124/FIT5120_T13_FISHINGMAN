@@ -16,7 +16,7 @@ import weatherRouter from "./routes/weather.js";
 
 import { getPool } from "./services/repo/mysqlPool.js";
 import knowledgeRouter from './fishingman_knowledge/knowledge_routes.js';
-
+import combinedRouter from "./species_combined/routes.js";
 
 dotenv.config();
 
@@ -85,6 +85,7 @@ app.use("/api/v1/protected", protectedRouter); // e.g. /api/v1/protected/species
 app.use("/api/v1/weather", weatherRouter);
 
 app.use('/api/v1/knowledge', knowledgeRouter);
+app.use("/api/v1/species_combined", combinedRouter);
 
 app.use("/api", (req, res) => {
   res.status(404).json({

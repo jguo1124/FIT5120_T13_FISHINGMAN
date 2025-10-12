@@ -3,10 +3,8 @@
     <div class="container">
       <ul>
         <li><RouterLink to="/" exact>Home</RouterLink></li>
-        <li><RouterLink to="/dashboard">Dashboard</RouterLink></li>
-        <li><RouterLink to="/species">Species</RouterLink></li>
+        <li><RouterLink :to="{ name: 'SpeciesCombined' }">GoPlanYourFishing</RouterLink></li>
         <li><RouterLink to="/knowledge">Knowledge Hub</RouterLink></li>
-        <li><RouterLink :to="{ name: 'SpeciesCombined' }">Species Combined</RouterLink></li>
         <li><RouterLink to="/about">About</RouterLink></li>
       </ul>
     </div>

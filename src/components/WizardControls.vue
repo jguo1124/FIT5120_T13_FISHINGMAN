@@ -1,60 +1,41 @@
 <!-- src/components/WizardControls.vue -->
 <script setup>
-const props = defineProps({
-  zones: { type: Array, default: () => [] },
-  zone: { type: String, default: "" },
-  onDate: { type: String, default: "" },
-  species: { type: String, default: "" },
-  speciesOptions: { type: Array, default: () => [] },
-  speciesLoading: { type: Boolean, default: false },
-  step: { type: Number, default: 1 },    // 1=Zone, 2=Date, 3=Results(+filter)
-  loading: { type: Boolean, default: false },
-  hideNoRestrictions: { type: Boolean, default: false }, // NEW: toggle value
-});
-const emit = defineEmits([
-  "update:zone",
-  "update:onDate",
-  "update:species",
-  "update:hideNoRestrictions",           // NEW: toggle update
-  "next",
-  "back",
-  "show",
-]);
-function onNext() {
-  // Step 1 -> 2：保留已选 zone，清空下游
-  if (!zone.value) return;
-  onDate.value = "";
-  species.value = "";
-  rawList.value = [];
-  speciesOptions.value = [];
-  step.value = 2;
-}
+  const props = defineProps({
+    zones: { type: Array, default: () => [] },
+    zone: { type: String, default: "" },
+    onDate: { type: String, default: "" },
+    species: { type: String, default: "" },
+    speciesOptions: { type: Array, default: () => [] },
+    speciesLoading: { type: Boolean, default: false },
+    step: { type: Number, default: 1 },
+    loading: { type: Boolean, default: false },
+    hideNoRestrictions: { type: Boolean, default: false },
+  });
 
-function onShow() {
-  if (!zone.value || !onDate.value) return;
-  step.value = 3;
-  loadAllRegulations();
-}
+  const emit = defineEmits([
+    "update:zone",
+    "update:onDate",
+    "update:species",
+    "update:hideNoRestrictions",
+    "next",
+    "back",
+    "show",
+    "clear-all"
+  ]);
 
-function onBack() {
-  if (step.value === 3) {
-    species.value = "";
-    step.value = 2;
-    return;
+  function handleBack() {
+    emit("back");
   }
-  if (step.value === 2) {
-    onDate.value = "";
-    species.value = "";
-    rawList.value = [];
-    speciesOptions.value = [];
-    step.value = 1;
+  function handleNext() {
+    emit("next");
   }
-}
-
-function onToggleHideNoRestrictions(v) {
-  hideNoRestrictions.value = v;
-}
-</script>
+  function handleShow() {
+    emit("show");
+  }
+  function handleToggleNoRestriction(e) {
+    emit("update:hideNoRestrictions", e.target.checked);
+  }
+  </script>
 
 <template>
   <div class="wizard">
@@ -77,9 +58,9 @@ function onToggleHideNoRestrictions(v) {
           :disabled="loading"
           @change="e => emit('update:zone', e.target.value)"
         >
-          <option value="" disabled>Select a zone…</option>
+          <option value="" disabled>Select a zone</option>
           <option v-for="z in zones" :key="z.code" :value="z.code">
-            {{ z.code }} — {{ z.area }}
+            {{ z.code }} - {{ z.area }}
           </option>
         </select>
 
@@ -108,10 +89,8 @@ function onToggleHideNoRestrictions(v) {
         />
 
         <div class="actions">
-          <button class="btn ghost" :disabled="loading" @click="emit('back')">Back</button>
-          <button class="btn primary" :disabled="!onDate || loading" @click="emit('show')">
-            Show results
-          </button>
+          <button class="btn ghost" :disabled="loading" @click="handleBack">Back</button>
+          <button class="btn primary" :disabled="!onDate || loading" @click="handleShow">Show results</button>
         </div>
       </div>
 
@@ -139,7 +118,7 @@ function onToggleHideNoRestrictions(v) {
                 {{ s.common_name || s.code }} ({{ s.code }})
               </option>
             </select>
-            <small v-if="speciesLoading" class="muted">Loading species…</small>
+            <small v-if="speciesLoading" class="muted">Loading species</small>
             <small v-else-if="!speciesLoading && !speciesOptions.length" class="muted">No species available</small>
           </div>
 
@@ -149,7 +128,7 @@ function onToggleHideNoRestrictions(v) {
               type="checkbox"
               :checked="hideNoRestrictions"
               :disabled="loading"
-              @change="e => emit('update:hideNoRestrictions', e.target.checked)"
+              @change="handleToggleNoRestriction"
             />
             <label for="hideNo" title="Hide rows where both size and daily limits are effectively 'no restriction'">
               Hide no-restriction species
@@ -158,8 +137,8 @@ function onToggleHideNoRestrictions(v) {
         </div>
 
         <div class="actions">
-          <button class="btn ghost" :disabled="loading" @click="emit('back')">Back</button>
-          <button class="btn" :disabled="loading" @click="emit('update:species','')">Clear filter</button>
+          <button class="btn ghost" :disabled="loading" @click="handleBack">Back</button>
+          <button class="btn" :disabled="loading" @click="emit('clear-all')">Clear all filters</button>
         </div>
       </div>
     </transition>
@@ -175,9 +154,15 @@ function onToggleHideNoRestrictions(v) {
 
 .label { display:block; font-size:12px; color:#475569; margin-top:6px; }
 .input {
-  width: 100%; height: 38px;
-  border: 1px solid #cbd5e1; border-radius: 10px; padding: 0 10px;
-  background: #fff; outline: none;
+  width: 100%;
+  height: 25px;            
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;           
+  padding: 0 8px;
+  background: #fff;
+  font-size: 14px;
+  line-height: 28px;         
+  outline: none;
 }
 .muted { color: #6b7280; font-size: 12px; }
 
@@ -213,5 +198,24 @@ function onToggleHideNoRestrictions(v) {
 
 @media (max-width: 720px) {
   .filters { grid-template-columns: 1fr; }
+}
+
+/* Hover + Active effect for Back and Clear Filter */
+.btn.ghost,
+.btn {
+  transition: all 0.18s ease;
+}
+
+.btn.ghost:hover,
+.btn:hover {
+  background: #0ea5e9;
+  color: #fff;
+  border-color: #0ea5e9;
+  transform: translateY(-1px);
+}
+
+.btn.ghost:active,
+.btn:active {
+  transform: scale(0.96);
 }
 </style>

@@ -2,7 +2,7 @@
 import { ref, onMounted, watch, computed } from "vue";
 import WizardControls from "@/components/WizardControls.vue";
 import RegList from "@/components/RegCard.vue";
-import EsSpeciesCard from "@/components/es/EsSpeciesCard.vue"; // ✅ image card for endangered species
+import EsSpeciesCard from "@/components/es/EsSpeciesCard.vue"; 
 import { fetchZones } from "@/lib/api";
 
 /* ---------- state ---------- */
@@ -38,7 +38,9 @@ async function loadCombinedSpecies() {
   errorMsg.value = "";
   groups.value = null;
   try {
-    const resp = await fetch(`/api/v1/species_combined/${encodeURIComponent(zone.value)}`);
+    const resp = await fetch(
+      `/api/v1/species_combined/${encodeURIComponent(zone.value)}?onDate=${encodeURIComponent(onDate.value)}`
+    );
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
     groups.value = data.groups; // { endangered, invasive, general }
@@ -62,8 +64,6 @@ function onDateChanged(v) {
   step.value = zone.value && onDate.value ? 3 : 2;
   loadCombinedSpecies();
 }
-watch(zone, v => { step.value = v ? 2 : 1; });
-watch(onDate, v => { if (zone.value && v) step.value = 3; });
 
 const stepPills = computed(() => ([
   { id: 1, label: "Zone",    icon: "📍", state: step.value >= 1 ? (step.value > 1 ? "done" : "current") : "todo" },
@@ -91,6 +91,87 @@ function toRegCardItem(sp, zoneCode, onDateStr) {
   };
 }
 
+function onBack() {
+  loading.value = false;
+  errorMsg.value = "";
+  if (step.value === 3) {
+    onDate.value = "";
+    groups.value = null;
+    step.value = 2;
+  } else if (step.value === 2) {
+    zone.value = "";
+    onDate.value = "";
+    groups.value = null;
+    step.value = 1;
+  } else {
+    step.value = 1;
+  }
+  generalPage.value = 1;
+}
+
+function onNext() {
+  if (!zone.value) return;
+  onDate.value = "";
+  groups.value = null;
+  step.value = 2;
+}
+
+function onShow() {
+  if (!zone.value || !onDate.value) return;
+  step.value = 3;
+  loadCombinedSpecies();
+}
+
+function onClearAll() {
+  loading.value = false;
+  errorMsg.value = "";
+  zone.value = "";
+  onDate.value = "";
+  species.value = "";
+  groups.value = null;
+  step.value = 1;
+  generalPage.value = 1;
+}
+
+const species = ref("");
+const speciesLoading = ref(false);
+
+const speciesOptions = computed(() => {
+  const map = new Map();
+  const buckets = [
+    groups.value?.endangered || [],
+    groups.value?.invasive || [],
+    groups.value?.general || []
+  ];
+  for (const arr of buckets) {
+    for (const sp of arr) {
+      const code = sp?.species;
+      if (!code) continue;
+      if (!map.has(code)) {
+        map.set(code, { code, common_name: sp.common_name || sp.species });
+      }
+    }
+  }
+  return Array.from(map.values()).sort((a, b) =>
+    String(a.common_name || a.code).localeCompare(String(b.common_name || b.code))
+  );
+});
+
+const filteredEndangered = computed(() => {
+  if (!species.value) return endangeredImageItems.value;
+  return endangeredImageItems.value.filter(s => s.species_code === species.value);
+});
+
+const filteredInvasive = computed(() => {
+  if (!species.value) return cardsInvasive.value;
+  return cardsInvasive.value.filter(it => it.species.code === species.value);
+});
+
+const filteredGeneral = computed(() => {
+  if (!species.value) return cardsGeneral.value;
+  return cardsGeneral.value.filter(it => it.species.code === species.value);
+});
+
 // For RegCard (invasive / general groups)
 const cardsInvasive = computed(() =>
   (groups.value?.invasive || []).map(sp => toRegCardItem(sp, zone.value, onDate.value))
@@ -99,7 +180,7 @@ const cardsGeneral = computed(() =>
   (groups.value?.general || []).map(sp => toRegCardItem(sp, zone.value, onDate.value))
 );
 
-// ✅ For EsSpeciesCard (endangered group with images)
+// For EsSpeciesCard (endangered group with images)
 const FALLBACK_IMG = "https://www.eftta.com/fileadmin/user_upload/FISHPROTECT_white__2.jpg";
 const endangeredImageItems = computed(() =>
   (groups.value?.endangered || []).map(sp => ({
@@ -112,6 +193,23 @@ const endangeredImageItems = computed(() =>
     source: sp.sources || sp.source || ""
   }))
 );
+
+const GENERAL_PAGE_SIZE = 6;
+const generalPage = ref(1);
+
+const generalTotalPages = computed(() => {
+  const total = filteredGeneral.value.length;
+  return Math.max(1, Math.ceil(total / GENERAL_PAGE_SIZE));
+});
+
+const pagedGeneral = computed(() => {
+  const start = (generalPage.value - 1) * GENERAL_PAGE_SIZE;
+  return filteredGeneral.value.slice(start, start + GENERAL_PAGE_SIZE);
+});
+
+watch(filteredGeneral, () => {
+  generalPage.value = 1;
+});
 
 /* ---------- init ---------- */
 onMounted(loadZones);
@@ -150,8 +248,17 @@ onMounted(loadZones);
         :onDate="onDate"
         :step="step"
         :loading="loading"
+        :species="species"
+        :speciesOptions="speciesOptions"
+        :speciesLoading="speciesLoading"
+        :key="step"
         @update:zone="onZoneChanged"
         @update:onDate="onDateChanged"
+        @update:species="v => (species.value = v)"
+        @back="onBack"
+        @next="onNext"
+        @show="onShow"
+        @clear-all="onClearAll"
       />
     </div>
 
@@ -165,26 +272,25 @@ onMounted(loadZones);
         <section class="band danger">
           <div class="band__head">
             <span class="dot red"></span>
-            <h3>Endangered / No-take ({{ endangeredImageItems.length }})</h3>
+            <h3>Endangered / No-take ({{ filteredEndangered.length }})</h3>
           </div>
           <div class="grid-cards">
             <EsSpeciesCard
-              v-for="sp in endangeredImageItems"
+              v-for="sp in filteredEndangered"
               :key="sp.species_code"
               :sp="sp"
             />
           </div>
-          <div v-if="endangeredImageItems.length === 0" class="empty">No endangered species in this zone.</div>
+          <div v-if="filteredEndangered.length === 0" class="empty">No endangered species in this zone.</div>
         </section>
 
-        <!-- 🟨 Invasive: RegCard -->
         <section class="band warning">
           <div class="band__head">
             <span class="dot yellow"></span>
-            <h3>Invasive ({{ cardsInvasive.length }})</h3>
+            <h3>Invasive ({{ filteredInvasive.length }})</h3>
           </div>
-        <RegList
-            :items="cardsInvasive"
+          <RegList
+            :items="filteredInvasive"
             :zone="zone"
             :onDate="onDate"
             :loading="loading"
@@ -192,20 +298,41 @@ onMounted(loadZones);
           />
         </section>
 
-        <!-- 🟩 General: RegCard -->
         <section class="band neutral">
           <div class="band__head">
             <span class="dot green"></span>
-            <h3>General ({{ cardsGeneral.length }})</h3>
+            <h3>General ({{ filteredGeneral.length }})</h3>
           </div>
           <RegList
-            :items="cardsGeneral"
+            :items="pagedGeneral"
             :zone="zone"
             :onDate="onDate"
             :loading="loading"
             :hideNoRestrictions="false"
           />
         </section>
+
+        <div v-if="generalTotalPages > 1" class="pager">
+          <button
+            class="btn ghost"
+            :disabled="generalPage <= 1 || loading"
+            @click="generalPage = Math.max(1, generalPage - 1)"
+          >
+            Previous
+          </button>
+
+          <span class="pager-info">
+            Page {{ generalPage }} of {{ generalTotalPages }}
+          </span>
+
+          <button
+            class="btn ghost"
+            :disabled="generalPage >= generalTotalPages || loading"
+            @click="generalPage = Math.min(generalTotalPages, generalPage + 1)"
+          >
+            Next
+          </button>
+        </div>
       </template>
 
       <div v-else-if="!loading && step < 3" class="empty">
@@ -296,5 +423,47 @@ onMounted(loadZones);
 .alert.error {
   background: #fee2e2; color: #991b1b; border: 1px solid #fecaca;
   padding: 10px 12px; border-radius: 10px; margin: 10px 0 14px;
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.pager-info {
+  font-size: 14px;
+  color: #64748b;
+}
+
+/* Pager button hover + click effects */
+.pager .btn {
+  min-width: 90px;
+  height: 34px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #0f172a;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.pager .btn:hover {
+  background: #0ea5e9;     
+  color: #fff;             
+  border-color: #0ea5e9;
+  transform: translateY(-1px);
+}
+
+.pager .btn:active {
+  transform: scale(0.96);
+}
+
+.pager .btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 </style>

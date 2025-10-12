@@ -89,7 +89,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
-import KnowledgeCard from '@/components/KnowledgeCard/KnowledgeCard.vue'
+import KnowledgeCard from '@/components/KnowledgeCard/KnowledgeCards.vue'
 import { fetchKnowledge } from '@/lib/api.js'
 
 const tabs = [
@@ -111,7 +111,7 @@ const error = ref(null)
 const tabLabel = computed(() => (tab.value === 'tutorial' ? 'Fishing Tutorial' : 'News'))
 
 // mock data so UI is visible
-const useMock = true
+const useMock = false
 function genMock(kind, n = 20) {
   return Array.from({ length: n }).map((_, i) => ({
     id: `${kind}-${i + 1}`,
@@ -270,7 +270,7 @@ onMounted(() => { document.title = 'GoFish - Knowledge Hub'; load() })
   grid-column:1 / -1;
   display:grid;
   grid-template-columns:1fr 1fr 2fr;  /* Title | Date | Source */
-  column-gap:24px;
+  column-gap:300px;
 }
 
 /* header row */
