@@ -46,7 +46,7 @@ function fmtSizeLabel(nr) {
   if (f.noSizeLimit) return "No size limit";
   const min = toStr(nr?.rule?.min_cm);
   const max = toStr(nr?.rule?.max_cm);
-  const minTxt = isNilOrEmpty(min) || isZero(min) ? "—" : `${min} cm`;
+  const minTxt = isNilOrEmpty(min) || isZero(min) ? "-" : `${min} cm`;
   const maxTxt = isNilOrEmpty(max) || isNoLimit(max) ? "No Limit" : `${max} cm`;
   return `Min: ${minTxt} · Max: ${maxTxt}`;
 }
@@ -55,7 +55,7 @@ function fmtDailyLabel(nr) {
   const f = deriveFlags(nr);
   if (f.noTake) return "No take (bag limit 0)";
   if (f.noDailyLimit) return "No daily limit";
-  return `Daily: ${nr?.rule?.daily_bag_limit ?? "—"}`;
+  return `Daily: ${nr?.rule?.daily_bag_limit ?? "-"}`;
 }
 
 /* filtering */

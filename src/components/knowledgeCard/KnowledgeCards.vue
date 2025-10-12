@@ -11,7 +11,7 @@
       {{ displayDate }}
     </div>
     <div class="col source" :title="item.source || ''">
-      {{ item.source || '—' }}
+      {{ item.source || '-' }}
     </div>
   </article>
 </template>

@@ -22,47 +22,48 @@
       </nav>
     </header>
 
-    <!-- width ruler + table -->
-    <div class="kh-wrap">
-      <!-- controls row (ruler) -->
-      <div class="kh-search">
-        <span class="ico">🔎</span>
-        <input
-          v-model.trim="q"
-          type="search"
-          placeholder="Search..."
-          aria-label="Search"
-          @keydown.enter.prevent
-        />
-      </div>
+    <!-- unified outer panel -->
+    <div class="kh-panel">
+      <!-- controls row -->
+      <div class="kh-wrap">
+        <div class="kh-search">
+          <span class="ico">🔎</span>
+          <input
+            v-model.trim="q"
+            type="search"
+            placeholder="Search..."
+            aria-label="Search"
+            @keydown.enter.prevent
+          />
+        </div>
 
-      <select v-model="tag" class="sel" aria-label="Filter by tag">
-        <option value="">All tags</option>
+       <select v-if="allTags.length" v-model="tag" class="sel" aria-label="Filter by tag">
         <option v-for="t in allTags" :key="t" :value="t">{{ t }}</option>
       </select>
 
-      <select v-model="sort" class="sel" aria-label="Sort">
-        <option value="date_desc">Newest → Oldest</option>
-        <option value="date_asc">Oldest → Newest</option>
-      </select>
+        <span class="label">Order:</span>
+        <select v-model="sort" class="sel" aria-label="Sort">
+          <option value="date_desc">Newest → Oldest</option>
+          <option value="date_asc">Oldest → Newest</option>
+        </select>
 
-      <select v-model.number="pageSize" class="sel" aria-label="Items per page">
-        <option :value="8">8</option>
-        <option :value="12">12</option>
-        <option :value="16">16</option>
-      </select>
+        <span class="label">Rows/page:</span>
+        <select v-model.number="pageSize" class="sel" aria-label="Items per page">
+          <option :value="8">8</option>
+          <option :value="12">12</option>
+          <option :value="16">16</option>
+        </select>
+      </div>
 
       <div class="kh-divider" aria-hidden="true"></div>
 
-      <!-- column headers -->
-      <div class="kh-header-row kh-table-grid">
-        <div>{{ tabLabel }}</div>
-        <div>Date</div>
-        <div>Source</div>
-      </div>
-
       <!-- list -->
       <div class="kh-list kh-table-grid">
+        <div class="kc-row kc-head">
+          <div class="col title">{{ tabLabel }}</div>
+          <div class="col date">Date</div>
+          <div class="col source">Source</div>
+        </div>
         <KnowledgeCard
           v-for="it in pagedItems"
           :key="it.id"
@@ -89,7 +90,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
-import KnowledgeCard from '@/components/KnowledgeCard/KnowledgeCards.vue'
+import KnowledgeCard from '@/components/knowledgeCard/KnowledgeCards.vue'
 import { fetchKnowledge } from '@/lib/api.js'
 
 const tabs = [
@@ -248,56 +249,75 @@ onMounted(() => { document.title = 'GoFish - Knowledge Hub'; load() })
 
 /* ruler: search | tag | sort | size */
 .kh-wrap {
-  display: grid;
-  grid-template-columns: minmax(320px, 1fr) max-content max-content max-content;
-  column-gap: 24px;
-  row-gap: 12px;
-  align-items: center;
+  display: flex;
+  align-items: flex-start;
+  gap: 3px;               
+  flex-wrap: wrap;         
   box-sizing: border-box;
 }
 
-.kh-search{
-  display:flex; align-items:center; gap:8px;
-  height:38px; border:1px solid var(--border); border-radius:10px; background:#fff; padding:0 12px;
+.kh-search {
+  flex: 1;                  
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  padding: 0 12px;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.sel {
+  box-sizing: border-box; 
+  height: 30px;
+  line-height: 25px;  
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  font-size: 14px;
+  outline: none;
+}
+.sel:focus{
+  border-color: var(--blue);
+  box-shadow: 0 0 0 2px rgba(54,173,225,.2);
+}
+.kh-search:focus-within{
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(54, 173, 225, .25); 
 }
 .kh-search input{ border:none; outline:none; font-size:14px; width:100%; color:var(--text); }
-.sel{ height:38px; padding:8px 12px; border:1px solid var(--border); border-radius:10px; background:#fff; font-size:14px; }
+.kh-search input:focus{
+  outline: none;
+}
 
-.kh-divider{ grid-column:1 / -1; height:1px; background:var(--border); margin-top:6px; }
+.kh-divider{ grid-column:1 / -1; height:1px; background:var(--border); margin-top:10px; }
 
 /* table grid (1:1:2) + force same width as ruler */
 .kh-table-grid{
   grid-column:1 / -1;
   display:grid;
-  grid-template-columns:1fr 1fr 2fr;  /* Title | Date | Source */
-  column-gap:300px;
-}
-
-/* header row */
-.kh-header-row{
-  font-weight:700; font-size:14px; color:var(--muted);
-  padding:12px 0; border-bottom:2px solid var(--border);
-}
-
-/* list + pager align with ruler exactly */
-.kh-header-row, .kh-list, .kh-pager{
-  grid-column:1 / -1; width:100%; margin-inline:0; padding-inline:0;
+  grid-template-columns: minmax(0, 2fr) minmax(0, .8fr) minmax(0, 1.2fr);
+  column-gap: 450px;
 }
 
 /* ===== centralize KnowledgeCard row styles via :deep() ===== */
 :deep(.kc-row){
   grid-column:1 / -1;              /* span full width of table grid */
   display:grid;
-  grid-template-columns:1fr 1fr 2fr;
-  column-gap:24px;
+  grid-template-columns: 1.5fr 0.3fr 0.8fr;
+  column-gap: 48px;
   align-items:center;
   padding:10px 0;                  /* no left/right padding for hard edge alignment */
   border-bottom:1px solid var(--border);
   background:transparent;
   box-shadow:none; border-radius:0;
+  padding-left: 8px;
+  padding-right: 8px;
 }
 :deep(.kc-title){
-  margin:0; font-size:16px; font-weight:700; color:var(--text);
+  margin:0; font-size:16px; font-weight:500; color:var(--text);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
 :deep(.kc-title a){ color:inherit; text-decoration:none; }
@@ -326,13 +346,79 @@ onMounted(() => { document.title = 'GoFish - Knowledge Hub'; load() })
 .kh-pager{
   display:flex; align-items:center; justify-content:center; gap:12px; margin-top:18px;
 }
-.pbtn{
-  border:1px solid var(--border); background:#fff; color:var(--text);
-  padding:8px 14px; border-radius:10px; cursor:pointer; min-width:90px; font-weight:700;
+
+.kh-panel .kh-pager .pbtn{
+  position: relative;
+  border: 1px solid var(--border);
+  background-color: #fff !important;
+  background-image: none !important;         
+  color: var(--text) !important;
+  padding: 8px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  min-width: 90px;
+  font-weight: 600;
+  transition: transform .18s ease, box-shadow .18s ease, color .18s ease, border-color .18s ease, background-color .18s ease;
+  -webkit-tap-highlight-color: transparent;
 }
-.pbtn:not(:disabled):hover{ background:#f8fafc; }
-.pbtn:disabled{ opacity:.45; cursor:not-allowed; }
+
+.kh-panel .kh-pager .pbtn:not(:disabled):hover{
+  background-color: #36ade1 !important;  
+  background-image: none !important;     
+  color: #fff !important;              
+  border-color: var(--blue) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(54, 173, 225, 0.35);
+}
+
+.kh-panel .kh-pager .pbtn:not(:disabled):active{
+  background-color: var(--blue) !important;
+  background-image: none !important;
+  color: #fff !important;
+  border-color: var(--blue) !important;
+  transform: translateY(1px) scale(0.98);
+  box-shadow: 0 2px 6px rgba(54, 173, 225, 0.4);
+}
+
+.kh-panel .kh-pager .pbtn:disabled{
+  opacity: .45;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
 .ppage{ font-size:14px; color:#64748b }
 
+/* unified outer panel */
+.kh-panel {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  padding: 18px 20px 24px;
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;        
+  box-sizing: border-box;
+}
 
+.kh-list { 
+  overflow: hidden; 
+}
+
+.kc-head {
+  font-weight: 700;       
+  font-size: 15px;    
+  color: #1f2937;         
+  letter-spacing: 0.5px;  
+  background: transparent; 
+}
+.label {
+  font-size: 14px;
+  color: var(--muted);
+  margin-left: 6px;
+  margin-right: 3px;
+  align-self: center;
+}
 </style>
