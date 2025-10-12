@@ -65,7 +65,7 @@
         </select>
 
         <div class="actions">
-          <button class="btn ghost" disabled @click="emit('back')">Back</button>
+          <button class="btn ghost fake-disabled" @click="handleBack" type="button" aria-disabled="true">Back</button>
           <button class="btn primary" :disabled="!zone || loading" @click="emit('next')">Next</button>
         </div>
       </div>
@@ -218,4 +218,7 @@
 .btn:active {
   transform: scale(0.96);
 }
+.fake-disabled {
+  opacity: .6; cursor: not-allowed;
+} 
 </style>

@@ -92,8 +92,14 @@ function toRegCardItem(sp, zoneCode, onDateStr) {
 }
 
 function onBack() {
+  if (step.value === 1) {
+    alert("This is the first step, you can't go back.");
+    return;
+  }
+
   loading.value = false;
   errorMsg.value = "";
+
   if (step.value === 3) {
     onDate.value = "";
     groups.value = null;
