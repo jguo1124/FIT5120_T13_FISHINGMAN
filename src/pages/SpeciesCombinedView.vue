@@ -434,9 +434,9 @@ onMounted(loadZones);
 .pager {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 8px;
+  justify-content: center;      
+  gap: 12px;
+  margin-top: 18px;
 }
 
 .pager-info {
@@ -444,32 +444,38 @@ onMounted(loadZones);
   color: #64748b;
 }
 
-/* Pager button hover + click effects */
 .pager .btn {
   min-width: 90px;
   height: 34px;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  background: #fff;
-  color: #0f172a;
+  border: none;    
+  border-radius: 10px;
+  background: #fff !important;
+  color: #0f172a !important;   
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.18s ease;
+  transition: transform .18s ease, box-shadow .18s ease,
+              color .18s ease, border-color .18s ease, background-color .18s ease;
 }
 
 .pager .btn:hover {
-  background: #0ea5e9;     
-  color: #fff;             
-  border-color: #0ea5e9;
-  transform: translateY(-1px);
+  background-color: #36ade1 !important;  
+  color: #fff !important;
+  border-color: #36ade1 !important;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(54, 173, 225, 0.35);
 }
 
 .pager .btn:active {
-  transform: scale(0.96);
+  background-color: #36ade1 !important;
+  color: #fff !important;
+  transform: translateY(1px) scale(0.98);
+  box-shadow: 0 2px 6px rgba(54, 173, 225, 0.4);
 }
 
 .pager .btn:disabled {
-  opacity: 0.6;
+  opacity: 0.45;
   cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
 }
 </style>
